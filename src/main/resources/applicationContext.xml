@@ -1,0 +1,351 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context" xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+   http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-2.5.xsd http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-2.5.xsd">
+
+    <bean id="propertyConfigurer" class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <list>
+                <value>classpath:env.properties</value>
+            </list>
+        </property>
+    </bean>
+
+    <context:component-scan base-package="com.suitesoftware.psa.catalogservice"/>
+
+    <tx:annotation-driven transaction-manager = "transactionManager" />
+
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+
+
+    <bean id="catalogSerivce" class="com.suitesoftware.psa.catalogservice.CatalogService">
+        <property name="catalogManager" ref="catalogManager"/>
+    </bean>
+
+    <bean id="catalogManager" class="com.suitesoftware.psa.catalogservice.CatalogManager">
+        <property name="psaCatalogDao" ref="psaCatalogDao"/>
+    </bean>
+
+    <bean id="accessManager" class="com.suitesoftware.psa.catalogservice.AccessManager">
+        <property name="psaCatalogDao" ref="psaCatalogDao"/>
+    </bean>
+
+    <bean id="psaCatalogDao" class="com.suitesoftware.psa.catalogservice.PsaCatalogDao">
+        <property name="dataSource" ref="dataSource"/>
+
+        <property name="getCustomerCatalogSql">
+            <value><![CDATA[
+                SELECT
+                    I.ITEM_ID AS id,
+                    V.FULL_NAME AS vendor,
+                    I.MAN_PART_NO AS manPartNo,
+                    I.manufacturer AS man,
+                    I.NAME AS partNo,
+                    CP.UNIT_PRICE AS price,
+                    I.SALESDESCRIPTION as "desc",
+                    I.MSRP as msrp,
+                    I.LAST_MODIFIED AS lastModified
+                FROM
+                    CUSTOMER_PRICES CP,
+                    ITEMS I
+                        LEFT OUTER JOIN VENDORS V ON I.VENDOR_ID = V.VENDOR_ID
+                WHERE
+                    CP.CUSTOMER_ID = :customerId AND
+                    CP.ITEM_ID = I.ITEM_ID
+            ]]></value>
+        </property>
+
+        <property name="updateCustomerItemPricesSql">
+            <value><![CDATA[
+               UPDATE
+                    CUSTOMER_PRICES SET UNIT_PRICE = IP.ITEM_UNIT_PRICE
+                FROM
+                    ITEM_PRICES IP,
+                    CUSTOMER_ITEM_PRICING CIP
+                WHERE
+                    CIP.CUSTOMER_ID = :customerId AND
+                    IP.ITEM_ID = CIP.ITEM_ID AND
+                    IP.ITEM_PRICE_ID = CIP.PRICE_TYPE_ID AND
+                    IP.item_QUANTITY_ID = 1 AND
+                    IP.ITEM_ID = CUSTOMER_PRICES.ID AND
+        		    CIP.CUSTOMER_ID = CUSTOMER_PRICES.CUSTOMER_ID
+
+            ]]></value>
+        </property>
+
+        <property name="updateCustomerGroupPricesSql">
+            <value><![CDATA[
+               UPDATE
+                    CUSTOMER_PRICES SET UNIT_PRICE = IP.ITEM_UNIT_PRICE
+                FROM
+                    ITEM_PRICES IP,
+                    CUSTOMER_GROUP_PRICING CGP,
+                    ITEMS I
+                WHERE
+                    CGP.CUSTOMER_ID = :customerId AND
+                    CGP.PRICING_GROUP_ID = I.PRICING_GROUP_ID AND
+                    I.ITEM_ID = IP.ITEM_ID AND
+                    IP.ITEM_QUANTITY_ID = 1 AND
+                    IP.CURRENCY_ID = 1 AND
+                    IP.ITEM_PRICE_ID = CGP.PRICE_TYPE_ID AND
+                    IP.ITEM_ID = CUSTOMER_PRICES.ID
+
+            ]]></value>
+        </property>
+
+        <property name="updateCustomerLevelPricesSql">
+            <value><![CDATA[
+        UPDATE
+            CUSTOMER_PRICES SET UNIT_PRICE = IP.ITEM_UNIT_PRICE
+        FROM
+         ITEM_PRICES IP,
+         CUSTOMERS C
+		WHERE
+		     C.CUSTOMER_ID = :customerId AND
+		     IP.ITEM_PRICE_ID = C.MULTIPLE_PRICE_ID AND
+		     IP.ITEM_QUANTITY_ID = 1 AND
+		     IP.CURRENCY_ID = 1 AND
+		     IP.ITEM_ID = CUSTOMER_PRICES.ID AND
+		     C.CUSTOMER_ID = CUSTOMER_PRICES.CUSTOMER_ID
+            ]]></value>
+        </property>
+
+
+        <!-- note we are using "online Price" as base price -->
+        <property name="insertBasePricesSql">
+            <value><![CDATA[
+                INSERT
+                    INTO CUSTOMER_PRICES (CUSTOMER_ID,ITEM_ID,UNIT_PRICE)
+                SELECT
+                    {$ CUSTOMER_ID}, IP.ITEM_ID, IP.ITEM_UNIT_PRICE
+                FROM
+                    ITEM_PRICES IP,
+                    ITEMS I
+                WHERE
+                    IP.ITEM_PRICE_ID = 5 AND
+                    IP.ITEM_ID = I.ITEM_ID AND
+                    IP.ITEM_QUANTITY_ID = 1 AND
+                    IP.CURRENCY_ID = 1
+            ]]></value>
+        </property>
+
+
+        <property name="queryBasePriceListSql">
+            <value><![CDATA[
+                SELECT
+
+                    I.ITEM_ID AS id,
+                    V.FULL_NAME AS vendor,
+                    I.mpn AS manPartNo,
+                    I.manufacturer AS man,
+                    I.NAME AS partNo,
+                    IP.ITEM_UNIT_PRICE AS price,
+                    I.SALESDESCRIPTION as desc,
+                    I.LIST_0 as msrp,
+                    I.MODIFIED AS lastModified
+
+                FROM
+                    ITEMS I
+                        LEFT OUTER JOIN VENDORS V ON I.VENDOR_ID = V.VENDOR_ID
+                        LEFT OUTER JOIN ITEM_PRICES IP ON I.ITEM_ID = IP.ITEM_ID AND
+                            IP.ITEM_QUANTITY_ID = 1 AND
+                            IP.CURRENCY_ID = 1 AND
+                            IP.ITEM_PRICE_ID = 5
+                ORDER BY I.NAME
+
+            ]]></value>
+        </property>
+
+        <property name="queryBasePartSql">
+            <value><![CDATA[
+                SELECT
+                    I.ITEM_ID AS id,
+                    V.FULL_NAME AS vendor,
+                    I.mpn AS manPartNo,
+                    I.manufacturer AS man,
+                    I.NAME AS partNo,
+                    IP.ITEM_UNIT_PRICE AS price,
+                    I.SALESDESCRIPTION as desc,
+                    I.LIST_0 as msrp,
+                    I.MODIFIED AS lastModified
+
+                FROM
+                    ITEMS I
+                        LEFT OUTER JOIN VENDORS V ON I.VENDOR_ID = V.VENDOR_ID
+                        LEFT OUTER JOIN ITEM_PRICES IP ON I.ITEM_ID = IP.ITEM_ID AND
+                            IP.ITEM_QUANTITY_ID = 1 AND
+                            IP.CURRENCY_ID = 1 AND
+                            IP.ITEM_PRICE_ID = 5
+                WHERE
+                    I.ITEM_ID = :partId
+                ORDER BY I.NAME
+
+            ]]></value>
+        </property>
+
+
+        <property name="updateCustomerItemPriceMapSql">
+            <value><![CDATA[
+                SELECT
+                    IP.ITEM_ID AS ITEM_ID, IP.ITEM_UNIT_PRICE AS PRICE
+                FROM
+                    ITEM_PRICES IP,
+                    CUSTOMER_ITEM_PRICING CIP,
+                    ITEMS I
+                WHERE
+                    CIP.CUSTOMER_ID = ? AND
+                    I.ITEM_ID = IP.ITEM_ID AND
+                    IP.ITEM_PRICE_ID = CIP.PRICE_TYPE_ID AND
+                    IP.ITEM_QUANTITY_ID = 1
+            ]]></value>
+        </property>
+
+        <property name="updateCustomerGroupPriceMapSql">
+            <value><![CDATA[
+                SELECT
+                    IP.ITEM_ID AS ITEM_ID, IP.ITEM_UNIT_PRICE AS PRICE
+                FROM
+                    ITEM_PRICES IP,
+                    CUSTOMER_GROUP_PRICING CGP,
+                    ITEMS I
+                WHERE
+                    CGP.CUSTOMER_ID = ? AND
+                    CGP.PRICING_GROUP_ID = I.PRICING_GROUP_ID AND
+                    I.ITEM_ID = IP.ITEM_ID AND
+                    IP.ITEM_QUANTITY_ID = 1 AND
+                    IP.CURRENCY_ID = 1 AND
+                    IP.ITEM_PRICE_ID = CGP.PRICE_TYPE_ID
+            ]]></value>
+        </property>
+
+        <property name="updateCustomerLevelPriceMapSql">
+            <value><![CDATA[
+                SELECT
+                    IP.ITEM_ID AS ITEM_ID, IP.ITEM_UNIT_PRICE AS PRICE
+                FROM
+                    ITEM_PRICES IP,
+                    ITEMS I,
+                    CUSTOMERS C
+                WHERE
+                    C.CUSTOMER_ID = ? AND
+                    IP.ITEM_PRICE_ID = C.MULTIPLE_PRICE_ID AND
+                    IP.ITEM_QUANTITY_ID = 1 AND
+                    IP.CURRENCY_ID = 1 AND
+                    IP.ITEM_ID = I.ITEM_ID
+            ]]></value>
+        </property>
+
+
+        <property name="queryCustomerPriceListCacheQuerySql">
+            <value><![CDATA[
+                SELECT
+                    id,
+                    price,
+                    last_modified,
+                    part_no,
+                    man_part_no,
+                    man,
+                    "desc",
+                    msrp,
+                    discontinue,
+                    vendor
+                FROM
+                    customer_prices
+                where customer_id = ?
+                order by part_no
+            ]]></value>
+        </property>
+
+
+        <property name="insertCustomerPriceSql">
+            <value><![CDATA[
+            INSERT INTO customer_prices(
+                id, price, customer_id, last_modified, man_part_no, man, "desc", msrp, discontinue, vendor, part_no)
+            VALUES
+                (:id,:price, :customerId, :lastModified, :manPartNo, :man, :desc,:msrp, :discontinue, :vendor, :partNo)
+            ]]></value>
+        </property>
+
+        <property name="updateCustomerPriceSql">
+            <value><![CDATA[
+            UPDATE customer_prices
+                set price = :price,
+                    last_modified = :lastModified,
+                    man_part_no = :manPartNo,
+                    man = :man,
+                    "desc" = :desc,
+                    msrp = :msrp,
+                    discontinue = :discontinue,
+                    vendor = :vendor,
+                    part_no = :partNo
+                where
+                    customer_id = :customerId and id = :id
+            ]]></value>
+        </property>
+        <property name="discontinueCustomerPriceSql">
+            <value><![CDATA[
+            UPDATE customer_prices
+                set last_modified = now(),
+                    discontinue = true
+                where
+                    customer_id = :customerId and id = :id
+            ]]></value>
+        </property>
+
+
+
+        <property name="queryCachedCustomerPartsSql">
+            <value><![CDATA[
+                SELECT
+
+                    id AS id,
+                    vendor AS vendor,
+                    man_part_no AS manPartNo,
+                    man AS man,
+                    part_no partNo,
+                    price AS price,
+                    "desc" AS desc,
+                    msrp AS msrp,
+                    discontinue as discontinue,
+                    last_modified AS lastModified
+                FROM
+                    customer_prices
+                WHERE
+                    customer_id = :customerId
+           ]]></value>
+        </property>
+
+
+        <property name="getCatalogCustomerSql">
+            <value><![CDATA[
+                SELECT
+                    customer_id,
+                    "name",
+                    companyname,
+                    multiple_price_id,
+                    old_id,
+                    price_list_access_key
+                FROM customers
+                WHERE
+                    customer_id = :customerId
+           ]]></value>
+        </property>
+
+    </bean>
+
+
+    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
+        <property name="username" value="suite"/> <!-- larry.blanchette@celigo.com"/ -->
+        <property name="password" value="Ball00ns"/> <!-- celigo1"/ -->
+        <property name="url" value="${dbUrl}"/>
+        <property name="driverClassName" value="org.postgresql.Driver"/>
+        <!--<property name="suppressClose" value="true"/>-->
+        <property name="defaultAutoCommit" value="false"/>
+    </bean>
+
+
+</beans>
