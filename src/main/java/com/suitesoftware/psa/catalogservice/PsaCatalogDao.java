@@ -348,14 +348,26 @@ public class PsaCatalogDao {
         return msps;
     }
 
+    private void addParts(List<SqlParameterSource> spsList) {
+        jdbcTemplate.batchUpdate(insertCustomerPriceSql,spsList.toArray(new SqlParameterSource[spsList.size()]));
+    }
+
     private void addPart(int customerId, Part part, BigDecimal customerPrice) {
         SqlParameterSource sps = getPartSqlParams(customerId, part,customerPrice);
         jdbcTemplate.update(insertCustomerPriceSql,sps);
     }
 
+    private void updateParts(List<SqlParameterSource> spsList) {
+        jdbcTemplate.batchUpdate(updateCustomerPriceSql,spsList.toArray(new SqlParameterSource[spsList.size()]));
+    }
+
     private void updatePart(int customerId, Part part, BigDecimal customerPrice) {
         SqlParameterSource sps = getPartSqlParams(customerId, part,customerPrice);
         jdbcTemplate.update(updateCustomerPriceSql,sps);
+    }
+
+    private void discontinueParts(List<SqlParameterSource> spsList) {
+        jdbcTemplate.batchUpdate(discontinueCustomerPriceSql,spsList.toArray(new SqlParameterSource[spsList.size()]));
     }
 
     private void discontinuePart(int customerId, int partId) {
@@ -425,16 +437,33 @@ public class PsaCatalogDao {
 //            throw new Error("Test error");
 //        }
 
+        List<SqlParameterSource> psList = new LinkedList<SqlParameterSource>();
+
         for(Integer partId : basePartsMap.keySet()) {
             if(!cachedPartIds.containsKey(partId)) {
-                addPart(customerId, basePartsMap.get(partId),customerPriceMap.get(partId));
+                psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
+                //addPart(customerId, basePartsMap.get(partId),customerPriceMap.get(partId));
             }
         }
+        if(psList.size() > 0) {
+            addParts(psList);
+            psList.clear();
+        }
         for(Integer partId : changedIdList) {
-            updatePart(customerId, basePartsMap.get(partId), customerPriceMap.get(partId));
+            psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
+            //updatePart(customerId, basePartsMap.get(partId), customerPriceMap.get(partId));
+        }
+        if(psList.size() > 0) {
+            updateParts(psList);
+            psList.clear();
         }
         for(Integer partId : discontinuedIdList) {
-            discontinuePart(customerId,partId);
+            psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
+            //discontinuePart(customerId,partId);
+        }
+        if(psList.size() > 0) {
+            discontinueParts(psList);
+            psList.clear();
         }
     }
 
