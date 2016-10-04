@@ -46,7 +46,7 @@
                     I.manufacturer AS man,
                     I.NAME AS partNo,
                     CP.UNIT_PRICE AS price,
-                    I.SALESDESCRIPTION as "desc",
+                    I.STOREDETAILEDDESCRIPTION as "desc",
                     I.MSRP as msrp,
                     I.LAST_MODIFIED AS lastModified
                 FROM
@@ -144,7 +144,7 @@
                     I.manufacturer AS man,
                     I.NAME AS partNo,
                     IP.ITEM_UNIT_PRICE AS price,
-                    I.SALESDESCRIPTION as desc,
+                    I.STOREDETAILEDDESCRIPTION as desc,
                     I.LIST_0 as msrp,
                     I.MODIFIED AS lastModified
 
@@ -169,7 +169,7 @@
                     I.manufacturer AS man,
                     I.NAME AS partNo,
                     IP.ITEM_UNIT_PRICE AS price,
-                    I.SALESDESCRIPTION as desc,
+                    I.STOREDETAILEDDESCRIPTION as desc,
                     I.LIST_0 as msrp,
                     I.MODIFIED AS lastModified
 
