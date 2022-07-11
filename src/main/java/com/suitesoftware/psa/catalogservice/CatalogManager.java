@@ -108,6 +108,9 @@ public class CatalogManager {
                 getPsaCatalogDao().updateCustomerPriceMap(customerPriceMap, customerId);
                 log.info("Update cache");
                 getPsaCatalogDao().updateCustomerCacheParts(customerId, basePartsMap,customerPriceMap);
+//                if(true) {
+//                    break;
+//                }
             }
             log.info("refreshCustomerPriceCache complete");
         } catch (Throwable ex) {
@@ -143,6 +146,20 @@ public class CatalogManager {
         return part;
     }
 
+    @Transactional(readOnly = false)
+    public void insertRequestLog(int customerId, String status, String response, int bytes) throws CatalogException {
+
+        log.info("insertRequestLog");
+        try {
+            getPsaCatalogDao().insertRequestLog(customerId,status,response,bytes);
+            log.info("insertRequestLog complete");
+        } catch (Throwable ex) {
+            log.info(ex.getMessage(),ex);
+            throw new CatalogException(ex);
+        }
+        log.info("Updating insertRequestLog complete customer ID: " + customerId);
+    }
+
 
     public static void main(String [] args) {
 
@@ -150,18 +167,19 @@ public class CatalogManager {
 
             ApplicationContext ctx = new ClassPathXmlApplicationContext("applicationContext.xml");
             CatalogManager cm = (CatalogManager) ctx.getBean("catalogManager");
-            PsaCatalogDao dao = cm.getPsaCatalogDao();
-            List<Part> partList = dao.getCachedCustomerPart(968,8);
 
-            int i = 0;
+            cm.refreshCustomerPriceCache();
+
+
+//            PsaCatalogDao dao = cm.getPsaCatalogDao();
+//            List<Part> partList = dao.getCachedCustomerPart(968,8);
+//
+//            int i = 0;
 
 
         } catch(Throwable ex) {
             ex.printStackTrace();
         }
-
-
-
     }
 
 }

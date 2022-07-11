@@ -28,6 +28,8 @@ public class Catalog {
     @XmlAttribute
     int customerId;
 
+    String message;
+
     PartList partList;
 
     public Catalog() {}
@@ -38,6 +40,14 @@ public class Catalog {
 
     public void setCustomerId(int customerId) {
         this.customerId = customerId;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public String getMessage() {
+        return message;
     }
 
     public PartList getPartList() {

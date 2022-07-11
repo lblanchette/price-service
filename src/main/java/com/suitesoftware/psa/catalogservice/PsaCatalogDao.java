@@ -404,7 +404,7 @@ public class PsaCatalogDao {
                 cachePart.setDesc(rs.getString("desc"));
                 cachePart.setMan(rs.getString("man"));
                 cachePart.setManPartNo(rs.getString("man_part_no"));
-                cachePart.setMsrp(rs.getBigDecimal("msrp"));
+                cachePart.setMsrp(rs.getDouble("msrp"));
                 cachePart.setPartNo(rs.getString("part_no"));
                 cachePart.setPrice(rs.getBigDecimal("price"));
                 cachePart.setVendor(rs.getString("vendor"));
@@ -458,8 +458,12 @@ public class PsaCatalogDao {
             psList.clear();
         }
         for(Integer partId : discontinuedIdList) {
-            psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
-            //discontinuePart(customerId,partId);
+            MapSqlParameterSource msps = new MapSqlParameterSource();
+            msps.addValue("id",partId);
+            msps.addValue("customerId",customerId);
+            psList.add(msps);
+//            psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
+//            discontinuePart(customerId,partId);
         }
         if(psList.size() > 0) {
             discontinueParts(psList);
@@ -479,4 +483,29 @@ public class PsaCatalogDao {
         msps.addValue("partId",partId);
         return jdbcTemplate.queryForObject(queryBasePartSql,new BeanPropertyRowMapper<Part>(Part.class),msps);
     }
+
+    public int getAccessCount(int customerId) {
+        String getCatalogAccessCountSql =
+                "SELECT count(*) FROM REQUEST_LOG WHERE CUSTOMER_ID = :customerId AND CREATE_TS > (CURRENT_TIMESTAMP - interval '24 hour') and STATUS = 'ACCEPTED'";
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("customerId",customerId);
+        return jdbcTemplate.queryForInt(getCatalogAccessCountSql, msps);
+    }
+    /*
+    INSERT INTO REQUEST_LOG (
+        "CUSTOMER_ID", "STATUS", "CREATE_TS")
+        VALUES (1, 1, CURRENT_TIMESTAMP);
+
+     */
+    public int insertRequestLog(int customerId, String status, String response, int bytes) {
+        String insertRequestLogSql =
+                "INSERT INTO REQUEST_LOG (CUSTOMER_ID, STATUS, CREATE_TS) VALUES (:customerId, :status, CURRENT_TIMESTAMP)";
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("customerId",customerId);
+        msps.addValue("status",status);
+        msps.addValue("response",response);
+        msps.addValue("bytes",bytes);
+        return jdbcTemplate.update(insertRequestLogSql, msps);
+    }
+
 }

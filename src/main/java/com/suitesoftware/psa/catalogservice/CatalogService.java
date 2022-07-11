@@ -65,18 +65,26 @@ public class CatalogService {
         try {
             log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey +" CustomerId:" + customerId);
             if(accessKey == null && headerAccessKey == null) {
-                throw new Exception("Access key is required");
+                log.warn("Access key is required CustomerId:" + customerId);
+                Catalog catalog = new Catalog();
+                catalog.setMessage("Access key is required");
+                return catalog;
+                //throw new Exception("Access key is required");
             }
-            if(!getAccessManager().grantCatalogAccess(customerId,accessKey != null ? accessKey : headerAccessKey)) {
-                throw new Exception("Access denied.  The access key provided is not authorized to access the requested resource");
+            try {
+                getAccessManager().grantCatalogAccess(customerId, accessKey != null ? accessKey : headerAccessKey);
+            } catch (Exception ex) {
+                Catalog catalog = new Catalog();
+                catalog.setMessage(ex.getMessage());
+                return catalog;
             }
+            getCatalogManager().insertRequestLog(customerId,"ACCEPTED","",0);
             Date modifiedSince = null;
             if(modifiedSinceStr != null && modifiedSinceStr.length() > 0) {
                 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
                 modifiedSince = sdf.parse(modifiedSinceStr);
             }
             return   getCatalogManager().cachedCatalogProducer(customerId, modifiedSince);
-            //return   getCatalogManager().catalogProducer(customerId, null);
         } catch (Throwable ex) {
             log.error("Error processing request: " + ex.getMessage(),ex);
             throw new Exception("Error processing request: " + ex.getMessage(),ex);
@@ -88,6 +96,26 @@ public class CatalogService {
     @Path("admin/refresh/customerPrices")
     @Produces("text/plain")
     public String refreshCustomerPrices(@QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
+        try {
+            log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey );
+            if(accessKey == null && headerAccessKey == null) {
+                throw new Exception("Access key is required");
+            }
+            if(!getAccessManager().grantAdminAccess(accessKey != null ? accessKey : headerAccessKey)) {
+                throw new Exception("Access denied.  The access key provided is not authorized to access the requested resource");
+            }
+            getCatalogManager().refreshCustomerPriceCache();
+            return "OK";
+        } catch (Throwable ex) {
+            log.error("Error processing request: " + ex.getMessage(),ex);
+            throw new Exception("Error processing request: " + ex.getMessage(),ex);
+        }
+    }
+
+    @GET
+    @Path("admin/refresh/customerPrice/{customerId : \\d+}")
+    @Produces("text/plain")
+    public String refreshCustomerPrice(@PathParam("customerId") int customerId, @QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
         try {
             log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey );
             if(accessKey == null && headerAccessKey == null) {
@@ -130,7 +158,7 @@ public class CatalogService {
         p.setLastModified(new Date());
         p.setMan("Samsung Techwin America");
         p.setManPartNo("SRD-850D");
-        p.setMsrp(new BigDecimal("1700.00"));
+        p.setMsrp(new Double("1700.00"));
         p.setPrice(new BigDecimal("765.00"));
         p.setVendor("PSA");
         return p;

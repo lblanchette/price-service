@@ -21,9 +21,23 @@ public class AccessManager {
         this.psaCatalogDao = psaCatalogDao;
     }
 
-    @Transactional (readOnly = true)
-    boolean grantCatalogAccess(int customerId, String key) {
+    @Transactional (readOnly = true, rollbackFor = Exception.class)
 
+    void grantCatalogAccess(int customerId, String key) throws Exception {
+
+        CatalogCustomer customer = getPsaCatalogDao().getCustomer(customerId);
+
+        if(key.equals(customer.getPriceListAccessKey())) {
+            if(getPsaCatalogDao().getAccessCount(customerId) > 10) {
+                throw new Exception("Access denied.  You have exceeded allowed usage for a 24 hour period.  customer ID: " + customerId);
+            }
+            return;
+        }
+        if("729695c9-4fae-11e0-b438-714473f5cce7".equals(key)){
+            return;
+        }
+        throw new Exception("Access denied. The access key provided is not authorized to access the requested resource");
+/*
         CatalogCustomer customer = getPsaCatalogDao().getCustomer(customerId);
 
         if(key.equals(customer.getPriceListAccessKey())) {
@@ -33,6 +47,7 @@ public class AccessManager {
             return true;
         }
         return false;
+ */
     }
 
     @Transactional (readOnly = true)

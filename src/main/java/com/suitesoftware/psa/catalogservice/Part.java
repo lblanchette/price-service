@@ -46,7 +46,7 @@ public class Part {
     private String desc;
 
     @XmlElement(required=false, nillable = true)
-    private BigDecimal msrp;
+    private Double msrp;
 
     @XmlElement(required=false, nillable = true)
     private boolean discontinue;
@@ -110,11 +110,11 @@ public class Part {
         this.desc = desc;
     }
 
-    public BigDecimal getMsrp() {
+    public Double getMsrp() {
         return msrp;
     }
 
-    public void setMsrp(BigDecimal msrp) {
+    public void setMsrp(Double msrp) {
         this.msrp = msrp;
     }
 
