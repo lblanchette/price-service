@@ -8,7 +8,7 @@ package com.suitesoftware.psa.catalogservice;
  */
 public class CatalogException extends Exception {
 
-    CatalogException(Throwable ex) {
+    public CatalogException(Throwable ex) {
         super(ex);
     }
 }

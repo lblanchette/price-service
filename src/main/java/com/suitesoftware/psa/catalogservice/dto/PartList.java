@@ -1,4 +1,4 @@
-package com.suitesoftware.psa.catalogservice;
+package com.suitesoftware.psa.catalogservice.dto;
 
 
 import javax.xml.bind.annotation.XmlAccessType;

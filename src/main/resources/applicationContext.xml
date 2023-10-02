@@ -20,22 +20,41 @@
         <property name="dataSource" ref="dataSource"/>
     </bean>
 
-
-
     <bean id="catalogSerivce" class="com.suitesoftware.psa.catalogservice.CatalogService">
         <property name="catalogManager" ref="catalogManager"/>
     </bean>
 
-    <bean id="catalogManager" class="com.suitesoftware.psa.catalogservice.CatalogManager">
-        <property name="psaCatalogDao" ref="psaCatalogDao"/>
+    <bean id="cacheFileManager" class="com.suitesoftware.psa.catalogservice.impl.CacheFileManagerImpl">
+        <property name="directory" value="${cacheFileDir}"/>
     </bean>
 
-    <bean id="accessManager" class="com.suitesoftware.psa.catalogservice.AccessManager">
-        <property name="psaCatalogDao" ref="psaCatalogDao"/>
+    <bean id="catalogManager" class="com.suitesoftware.psa.catalogservice.impl.CatalogManagerImpl">
+        <property name="catalogDao" ref="catalogDao"/>
+        <property name="cacheFileManager" ref="cacheFileManager"/>
     </bean>
 
-    <bean id="psaCatalogDao" class="com.suitesoftware.psa.catalogservice.PsaCatalogDao">
+    <bean id="accessManager" class="com.suitesoftware.psa.catalogservice.impl.AccessManagerImpl">
+        <property name="catalogDao" ref="catalogDao"/>
+        <property name="accessLimit" value="${accessLimit}"/>
+        <property name="serviceAdminKey" value="${serviceAdminKey}"/>
+    </bean>
+
+    <bean id="catalogDao" class="com.suitesoftware.psa.catalogservice.impl.CatalogDaoImpl">
         <property name="dataSource" ref="dataSource"/>
+
+        <property name="selectNsCatalogCustomersSql">
+            <value><![CDATA[
+                SELECT
+                    customer_id,
+                    "name",
+                    companyname,
+                    multiple_price_id,
+                    price_list_access_key
+                FROM customers
+                WHERE
+                    price_list_access_key is not NULL
+           ]]></value>
+        </property>
 
         <property name="getCustomerCatalogSql">
             <value><![CDATA[
@@ -121,7 +140,7 @@
                 INSERT
                     INTO CUSTOMER_PRICES (CUSTOMER_ID,ITEM_ID,UNIT_PRICE)
                 SELECT
-                    {$ CUSTOMER_ID}, IP.ITEM_ID, IP.ITEM_UNIT_PRICE
+                    :customerId, IP.ITEM_ID, IP.ITEM_UNIT_PRICE
                 FROM
                     ITEM_PRICES IP,
                     ITEMS I
@@ -240,6 +259,52 @@
         </property>
 
 
+
+<!--
+        <property name="updateCombinedCustomerPriceMapSql">
+            <value><![CDATA[
+                SELECT I.ITEM_ID AS ITEM_ID,
+                    COALESCE(IP.PRICE, GP.PRICE,CL.PRICE) AS PRICE
+                FROM
+                    ITEMS I
+                LEFT JOIN
+                    (SELECT IP.ITEM_ID AS ITEM_ID,
+                            IP.ITEM_UNIT_PRICE AS PRICE
+                        FROM CUSTOMERS C,
+                            ITEM_PRICES IP
+                        WHERE C.CUSTOMER_ID = ?
+                            AND IP.ITEM_PRICE_ID = C.MULTIPLE_PRICE_ID
+                            AND IP.ITEM_QUANTITY_ID = 1
+                            AND IP.CURRENCY_ID = 1 ) AS CL ON I.ITEM_ID = CL.ITEM_ID
+                LEFT JOIN
+                    (SELECT IP.ITEM_ID AS ITEM_ID,
+                            IP.ITEM_UNIT_PRICE AS PRICE
+                        FROM CUSTOMER_GROUP_PRICING CGP,
+                            ITEM_PRICES IP,
+                            ITEMS I
+                        WHERE CGP.CUSTOMER_ID = ?
+                            AND CGP.PRICING_GROUP_ID = I.PRICING_GROUP_ID
+                            AND I.ITEM_ID = IP.ITEM_ID
+                            AND IP.ITEM_QUANTITY_ID = 1
+                            AND IP.CURRENCY_ID = 1
+                            AND IP.ITEM_PRICE_ID = CGP.PRICE_TYPE_ID ) AS GP ON I.ITEM_ID = GP.ITEM_ID
+                LEFT JOIN
+                    (SELECT IP.ITEM_ID AS ITEM_ID,
+                            IP.ITEM_UNIT_PRICE AS PRICE
+                        FROM ITEM_PRICES IP,
+                            CUSTOMER_ITEM_PRICING CIP
+                        WHERE CIP.CUSTOMER_ID = ?
+                            AND IP.ITEM_PRICE_ID = CIP.PRICE_TYPE_ID
+                            AND IP.ITEM_QUANTITY_ID = 1
+                            AND IP.CURRENCY_ID = 1 ) AS IP ON I.ITEM_ID = IP.ITEM_ID
+                EXCEPT
+                SELECT ID AS ITEM_ID, PRICE
+                FROM CUSTOMER_PRICES
+                WHERE CUSTOMER_ID = ?
+    ]]></value>
+        </property>
+-->
+
         <property name="queryCustomerPriceListCacheQuerySql">
             <value><![CDATA[
                 SELECT
@@ -260,6 +325,18 @@
             ]]></value>
         </property>
 
+
+        <property name="queryCacheCustomerItemPricesSql">
+            <value><![CDATA[
+                SELECT
+                    id,
+                    price,
+                    last_modified
+                FROM
+                    cache_customer_item_prices
+                where customer_id = :customerId
+            ]]></value>
+        </property>
 
         <property name="insertCustomerPriceSql">
             <value><![CDATA[
@@ -301,7 +378,6 @@
         <property name="queryCachedCustomerPartsSql">
             <value><![CDATA[
                 SELECT
-
                     id AS id,
                     vendor AS vendor,
                     man_part_no AS manPartNo,
@@ -335,17 +411,574 @@
            ]]></value>
         </property>
 
+        <property name="getCacheCustomerPartsSql">
+            <value><![CDATA[
+                SELECT
+                    CI.ID,
+                    MAN_PART_NO,
+                    MAN,
+                    "desc",
+                    DISCONTINUE,
+                    VENDOR,
+                    PART_NO,
+                    MSRP,
+                    GREATEST(CIP.LAST_MODIFIED, CI.LAST_MODIFIED) LAST_MODIFIED,
+                    COALESCE(CIP.PRICE, CI.PRICE) PRICE
+                FROM CACHE_ITEMS CI
+                    LEFT JOIN
+                        (SELECT ID,
+                        PRICE,
+                        LAST_MODIFIED
+                        FROM CACHE_CUSTOMER_ITEM_PRICES
+                        WHERE CUSTOMER_ID = :customerId )
+                    AS CIP ON CI.ID = CIP.ID
+                WHERE DISCONTINUE = FALSE
+           ]]></value>
+        </property>
+
+        <property name="queryCachePartsListSql">
+            <value><![CDATA[
+                SELECT
+                    ID,
+                    MAN_PART_NO,
+                    MAN,
+                    "desc",
+                    DISCONTINUE,
+                    VENDOR,
+                    PART_NO,
+                    MSRP,
+                    LAST_MODIFIED,
+                    PRICE
+                FROM CACHE_ITEMS CI
+           ]]></value>
+        </property>
+
+        <property name="upsertCustomerPricesSql">
+            <value><![CDATA[
+                WITH CHANGED_PRICES AS
+                    (SELECT ID,  PRICE
+                        FROM XFER_CUSTOMER_ITEM_PRICES
+                        WHERE CUSTOMER_ID = :customerId
+
+                        EXCEPT
+
+                        SELECT CACHE_CUSTOMER_ITEM_PRICES.ID, CACHE_CUSTOMER_ITEM_PRICES.PRICE
+                        FROM CACHE_CUSTOMER_ITEM_PRICES
+                        WHERE CUSTOMER_ID = :customerId )
+
+                INSERT INTO CACHE_CUSTOMER_ITEM_PRICES
+                    (ID, CUSTOMER_ID, PRICE, LAST_MODIFIED)
+                SELECT
+                    CHANGED_PRICES.ID,
+                    :customerId,
+                    CHANGED_PRICES.PRICE,
+                    NOW()
+                FROM CHANGED_PRICES
+                ON CONFLICT(ID, CUSTOMER_ID) DO UPDATE
+                    SET
+                        PRICE = EXCLUDED.PRICE,
+                        LAST_MODIFIED = NOW()
+           ]]></value>
+        </property>
+
+        <property name="discontinueCustomerPricesSql">
+            <value><![CDATA[
+                WITH DISC_ITEMS AS
+                    (SELECT ID
+                        FROM CACHE_CUSTOMER_ITEM_PRICES
+                        EXCEPT SELECT ID
+                        FROM CACHE_ITEMS
+                        WHERE DISCONTINUE = FALSE )
+                DELETE
+                FROM CACHE_CUSTOMER_ITEM_PRICES USING DISC_ITEMS
+                WHERE DISC_ITEMS.ID = CACHE_CUSTOMER_ITEM_PRICES.ID
+            ]]></value>
+        </property>
+
+
+        <!--
+         - this adds or updates cache_items
+         - price is the "online price
+        -->
+        <property name="upsertCacheItemsSql">
+            <value><![CDATA[
+             WITH CHANGED_ITEMS AS
+                (SELECT
+                        ID,
+                        VENDOR,
+                        MAN_PART_NO,
+                        MAN,
+                        PART_NO,
+                        PRICE,
+                        "desc",
+                        MSRP,
+                        false AS DISCONTINUE
+                    FROM XFER_ITEMS
+
+                    EXCEPT
+
+                    SELECT
+                        ID,
+                        VENDOR,
+                        MAN_PART_NO,
+                        MAN,
+                        PART_NO,
+                        PRICE,
+                        "desc",
+                        MSRP,
+                        DISCONTINUE
+                    FROM CACHE_ITEMS
+                )
+            INSERT INTO CACHE_ITEMS
+                (ID, VENDOR, MAN_PART_NO, MAN, PART_NO, PRICE, "desc", MSRP, DISCONTINUE, LAST_MODIFIED)
+                SELECT
+                    CHANGED_ITEMS.ID,
+                    CHANGED_ITEMS.VENDOR,
+                    CHANGED_ITEMS.MAN_PART_NO,
+                    CHANGED_ITEMS.MAN,
+                    CHANGED_ITEMS.PART_NO,
+                    CHANGED_ITEMS.PRICE,
+                    CHANGED_ITEMS."desc",
+                    CHANGED_ITEMS.MSRP,
+                    CHANGED_ITEMS.DISCONTINUE,
+                    NOW()
+                FROM CHANGED_ITEMS
+                ON CONFLICT(ID) DO UPDATE
+                    SET
+                    VENDOR = EXCLUDED.VENDOR,
+                    MAN_PART_NO = EXCLUDED.MAN_PART_NO,
+                    MAN = EXCLUDED.MAN,
+                    PART_NO = EXCLUDED.PART_NO,
+                    PRICE = EXCLUDED.PRICE,
+                    "desc" = EXCLUDED."desc",
+                    MSRP = EXCLUDED.MSRP,
+                    DISCONTINUE = EXCLUDED.DISCONTINUE,
+                    LAST_MODIFIED = NOW()
+           ]]></value>
+        </property>
+
+        <property name="discontinueCacheItemsSql">
+            <value><![CDATA[
+                WITH IDS AS
+                    (SELECT ID
+                        FROM CACHE_ITEMS
+                        WHERE DISCONTINUE = FALSE
+                        EXCEPT SELECT ID
+                        FROM XFER_ITEMS)
+                UPDATE CACHE_ITEMS
+                SET DISCONTINUE = TRUE,
+                    LAST_MODIFIED = NOW()
+                FROM IDS
+                WHERE CACHE_ITEMS.ID = IDS.ID
+           ]]></value>
+        </property>
+
+        <property name="requestLogReportSql">
+            <value><![CDATA[
+                select to_char(rl.create_ts, 'YYYY-MM-DD HH24:MI:SS') request_time, rl.status status, c.customer_id customer_id, c.name name_id, c.companyname companyname
+                from request_log rl,
+                customers c
+                where
+                (rl.customer_id = c.customer_id)
+           ]]></value>
+        </property>
+
+
+    </bean>
+
+    <bean id="nsDao" class="com.suitesoftware.psa.catalogservice.impl.NsDaoImpl">
+
+        <property name="selectNsCatalogCustomerSql">
+            <value><![CDATA[
+                SELECT
+                    customer_id,
+                    "name",
+                    companyname,
+                    multiple_price_id,
+                    price_list_access_key
+                FROM customers
+                WHERE
+                    customer_id = :customerId
+           ]]></value>
+        </property>
+
+        <property name="selectNsCatalogCustomersSql">
+            <value><![CDATA[
+                SELECT
+                    customer_id,
+                    "name",
+                    companyname,
+                    multiple_price_id,
+                    price_list_access_key
+                FROM customers
+                WHERE
+                    price_list_access_key is not NULL and ISINACTIVE = 'No'
+           ]]></value>
+        </property>
+
+        <property name="selectNsBasePartsSql">
+            <value><![CDATA[
+                SELECT
+                    I.ITEM_ID AS id,
+                    V.FULL_NAME AS vendor,
+                    I.vendorname AS manPartNo,
+                    I.manufacturer AS man,
+                    I.NAME AS partNo,
+                    BP.ITEM_UNIT_PRICE AS price,
+                    I.STOREDETAILEDDESCRIPTION as desc,
+                    I.LIST_0 as msrp,
+                    I.MODIFIED AS lastModified
+
+                FROM ITEMS I
+
+                LEFT JOIN ITEM_PRICES AS BP
+                    ON I.ITEM_ID = BP.ITEM_ID
+                    AND BP.ITEM_PRICE_ID = :priceId
+                    AND BP.ITEM_QUANTITY_ID = :quantityId
+                    AND BP.CURRENCY_ID = :currencyId
+
+                LEFT JOIN VENDORS AS V ON I.VENDOR_ID = V.VENDOR_ID
+
+                WHERE
+
+                I.ISINACTIVE = 'No' AND I.ISONLINE = 'Yes'
+
+                ORDER BY I.NAME ASC
+            ]]></value>
+        </property>
+
+        <property name="selectNsCustomerPricesSql">
+            <value><![CDATA[
+        SELECT I.ITEM_ID AS ID, COALESCE(IP.PRICE, GP.PRICE, CL.PRICE) AS PRICE
+
+        FROM ITEMS I
+
+        LEFT JOIN
+        (SELECT IP.ITEM_ID AS ID,
+        IP.ITEM_UNIT_PRICE AS PRICE
+        FROM CUSTOMERS C,
+        ITEM_PRICES IP
+        WHERE C.CUSTOMER_ID = :customerId
+        AND IP.ITEM_PRICE_ID = C.MULTIPLE_PRICE_ID
+        AND IP.ITEM_QUANTITY_ID = :quantityId
+        AND IP.CURRENCY_ID = :currencyId ) AS CL ON I.ITEM_ID = CL.ID
+
+        LEFT JOIN
+        (SELECT IP.ITEM_ID AS IP_ITEM_ID, CGP.PRICING_GROUP_ID AS PRICING_GROUP_ID,
+        IP.ITEM_UNIT_PRICE AS PRICE
+        FROM CUSTOMER_GROUP_PRICING CGP,
+        ITEM_PRICES IP
+        WHERE CGP.CUSTOMER_ID = :customerId
+        AND IP.ITEM_QUANTITY_ID = :quantityId
+        AND IP.CURRENCY_ID = :currencyId
+        AND IP.ITEM_PRICE_ID = CGP.PRICE_TYPE_ID ) AS GP
+        ON I.ITEM_ID = GP.IP_ITEM_ID AND I.PRICING_GROUP_ID = GP.PRICING_GROUP_ID
+
+        LEFT JOIN
+        (SELECT IP.ITEM_ID AS ID,
+        IP.ITEM_UNIT_PRICE AS PRICE
+        FROM ITEM_PRICES IP,
+        CUSTOMER_ITEM_PRICING CIP
+        WHERE CIP.CUSTOMER_ID = :customerId
+        AND IP.ITEM_PRICE_ID = CIP.PRICE_TYPE_ID
+        AND IP.ITEM_QUANTITY_ID = :quantityId
+        AND IP.CURRENCY_ID = :currencyId) AS IP ON I.ITEM_ID = IP.ID
+
+        WHERE ISINACTIVE = 'No' AND ISONLINE = 'Yes'
+
+            ]]></value>
+        </property>
+
+    </bean>
+
+    <bean id="nsCatalogManager" class="com.suitesoftware.psa.catalogservice.impl.NsCatalogManagerImpl">
+        <property name="nsDataSourceFactory" ref="nsDataSourceFactory"/>
+        <property name="nsDao" ref="nsDao"/>
+    </bean>
+
+    <bean id="customersDll" class="com.suitesoftware.dbcopy.DdlDef">
+        <property name="createDdl">
+            <value><![CDATA[
+                (
+                    CUSTOMER_ID INTEGER NOT NULL,
+                    NAME VARCHAR(100),
+                    COMPANYNAME VARCHAR(100),
+                    MULTIPLE_PRICE_ID INTEGER,
+                    OLD_ID INTEGER,
+                    PRICE_LIST_ACCESS_KEY VARCHAR(100)
+                )
+            ]]></value>
+        </property>
+        <property name="primaryKey">
+            <value><![CDATA[CUSTOMER_ID]]></value>
+        </property>
+    </bean>
+
+    <bean id="customerCopyDef" class="com.suitesoftware.dbcopy.CopyDef">
+        <property name="srcTable" value="CUSTOMERS"/>
+        <property name="dstTable" value="CUSTOMERS"/>
+        <property name="useTemp" value="true"/>
+        <property name="ddlDef" ref="customersDll"/>
+        <property name="columns">
+            <list>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="CUSTOMER_ID"/>
+                    <property name="asName" value="customer_id"/>
+                    <property name="type" value="1"/>
+                    <property name="sortKey" value="true"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="NAME"/>
+                    <property name="asName" value="name"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="COMPANYNAME"/>
+                    <property name="asName" value="companyname"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="OLD_ID"/>
+                    <property name="asName" value="old_id"/>
+                    <property name="type" value="1"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="MULTIPLE_PRICE_ID"/>
+                    <property name="asName" value="multiple_price_id"/>
+                    <property name="type" value="1"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="PRICE_LIST_ACCESS_KEY"/>
+                    <property name="asName" value="price_list_access_key"/>
+                    <property name="type" value="2"/>
+                </bean>
+            </list>
+        </property>
+        <property name="whereClause" value="ISINACTIVE = 'No' AND IS_PERSON = 'No'"/>
+        <property name="orderByClause" value="order by CUSTOMER_ID ASC"/>
     </bean>
 
 
-    <bean id="dataSource" class="org.apache.commons.dbcp.BasicDataSource">
-        <property name="username" value="suite"/> <!-- larry.blanchette@celigo.com"/ -->
-        <property name="password" value="Ball00ns"/> <!-- celigo1"/ -->
+    <bean id="itemCopyDef" class="com.suitesoftware.dbcopy.CopyDef">
+        <property name="srcTable" value="items selectSql"/>
+        <property name="dstTable" value="xfer_items"/>
+        <property name="columns">
+            <list value-type="com.suitesoftware.dbcopy.ColCopyDef">
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="ID"/>
+                    <property name="asName" value="id"/>
+                    <property name="type" value="1"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="price"/>
+                    <property name="asName" value="price"/>
+                    <property name="type" value="3"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="man_part_no"/>
+                    <property name="asName" value="man_part_no"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="man"/>
+                    <property name="asName" value="man"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="part_no"/>
+                    <property name="asName" value="part_no"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="desc"/>
+                    <property name="asName" value="desc"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="vendor"/>
+                    <property name="asName" value="vendor"/>
+                    <property name="type" value="2"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="msrp"/>
+                    <property name="asName" value="msrp"/>
+                    <property name="type" value="3"/>
+                </bean>
+
+            </list>
+        </property>
+        <property name="selectSql">
+            <value><![CDATA[
+                SELECT
+                    I.ITEM_ID AS id,
+                    V.FULL_NAME AS vendor,
+                    I.VENDORNAME AS man_part_no,
+                    I.manufacturer AS man,
+                    I.NAME AS part_no,
+                    IP.ITEM_UNIT_PRICE AS price,
+                    I.STOREDETAILEDDESCRIPTION as "desc",
+                    I.LIST_0 as msrp
+                FROM
+                    ITEMS I
+                        LEFT OUTER JOIN VENDORS V ON I.VENDOR_ID = V.VENDOR_ID
+                        LEFT OUTER JOIN ITEM_PRICES IP ON I.ITEM_ID = IP.ITEM_ID AND
+                            IP.ITEM_QUANTITY_ID = 1 AND
+                            IP.CURRENCY_ID = 1 AND
+                            IP.ITEM_PRICE_ID = 5
+                WHERE
+                    I.ISINACTIVE = 'No' AND I.ISONLINE = 'Yes'
+            ]]></value>
+        </property>
+
+        <property name="ddlDef">
+            <bean class="com.suitesoftware.dbcopy.DdlDef">
+                <property name="createDdl">
+                    <value><![CDATA[
+                        (
+                            id integer NOT NULL,
+                            price numeric(22,2),
+                            man_part_no character varying(100) COLLATE pg_catalog."default",
+                            man character varying(200) COLLATE pg_catalog."default",
+                            "desc" character varying(4000) COLLATE pg_catalog."default",
+                            vendor character varying(200) COLLATE pg_catalog."default",
+                            part_no character varying(180) COLLATE pg_catalog."default",
+                            msrp numeric(22,2)
+                        )
+                    ]]></value>
+                </property>
+                <property name="primaryKey" value="id"/>
+            </bean>
+        </property>
+    </bean>
+
+
+    <bean id="customerPriceCopyDef" class="com.suitesoftware.dbcopy.CopyDef">
+        <property name="srcTable" value="customer prices selectSql"/>
+        <property name="dstTable" value="xfer_customer_item_prices"/>
+        <property name="columns">
+            <list value-type="com.suitesoftware.dbcopy.ColCopyDef">
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="CUSTOMER_ID"/>
+                    <property name="asName" value="customer_id"/>
+                    <property name="type" value="1"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="ID"/>
+                    <property name="asName" value="id"/>
+                    <property name="type" value="1"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="PRICE"/>
+                    <property name="asName" value="price"/>
+                    <property name="type" value="3"/>
+                </bean>
+            </list>
+        </property>
+        <property name="useTemp" value="false"/>
+        <property name="prepSql">
+            <value><![CDATA[
+                DELETE FROM xfer_customer_item_prices WHERE customer_id = :customerId
+            ]]></value>
+        </property>
+
+        <property name="selectSql">
+            <value><![CDATA[
+
+        SELECT :customerId AS CUSTOMER_ID, I.ITEM_ID AS ID, COALESCE(IP.PRICE, GP.PRICE, CL.PRICE) AS PRICE
+
+        FROM ITEMS I
+
+        LEFT JOIN
+        (SELECT IP.ITEM_ID AS ID,IP.ITEM_UNIT_PRICE AS PRICE
+        FROM CUSTOMERS C,
+        ITEM_PRICES IP
+        WHERE C.CUSTOMER_ID = :customerId
+        AND IP.ITEM_PRICE_ID = C.MULTIPLE_PRICE_ID
+        AND IP.ITEM_QUANTITY_ID = :quantityId
+        AND IP.CURRENCY_ID = :currencyId ) AS CL ON I.ITEM_ID = CL.ID
+
+        LEFT JOIN
+        (SELECT IP.ITEM_ID AS IP_ITEM_ID, CGP.PRICING_GROUP_ID AS PRICING_GROUP_ID,
+        IP.ITEM_UNIT_PRICE AS PRICE
+        FROM CUSTOMER_GROUP_PRICING CGP,
+        ITEM_PRICES IP
+        WHERE CGP.CUSTOMER_ID = :customerId
+        AND IP.ITEM_QUANTITY_ID = :quantityId
+        AND IP.CURRENCY_ID = :currencyId
+        AND IP.ITEM_PRICE_ID = CGP.PRICE_TYPE_ID ) AS GP
+        ON I.ITEM_ID = GP.IP_ITEM_ID AND I.PRICING_GROUP_ID = GP.PRICING_GROUP_ID
+
+        LEFT JOIN
+        (SELECT IP.ITEM_ID AS ID,
+        IP.ITEM_UNIT_PRICE AS PRICE
+        FROM ITEM_PRICES IP,
+        CUSTOMER_ITEM_PRICING CIP
+        WHERE CIP.CUSTOMER_ID = :customerId
+        AND IP.ITEM_PRICE_ID = CIP.PRICE_TYPE_ID
+        AND IP.ITEM_QUANTITY_ID = :quantityId
+        AND IP.CURRENCY_ID = :currencyId) AS IP ON I.ITEM_ID = IP.ID
+
+        WHERE ISINACTIVE = 'No' AND ISONLINE = 'Yes' AND PRICE IS NOT NULL
+            ]]></value>
+        </property>
+
+        <property name="ddlDef">
+            <bean class="com.suitesoftware.dbcopy.DdlDef">
+                <property name="createDdl">
+                    <value><![CDATA[
+                        (
+                            customer_id integer NOT NULL,
+                            id integer NOT NULL,
+                            price numeric(22,2)
+                        )
+                    ]]></value>
+                </property>
+                <property name="primaryKey" value="(customer_id,id)"/>
+            </bean>
+        </property>
+    </bean>
+
+    <bean id="cacheManager" class="com.suitesoftware.psa.catalogservice.impl.CacheManagerImpl">
+        <property name="catalogDao" ref="catalogDao"/>
+    </bean>
+
+    <bean id="refreshTaskExecutor" class="org.springframework.core.task.SimpleAsyncTaskExecutor">
+        <property name="ThreadNamePrefix" value="RefreshTask"/>
+        <property name="concurrencyLimit" value="0"/> <!-- no concurency for now -->
+    </bean>
+
+    <bean id="refreshNsCustomerPriceCacheJob" class="com.suitesoftware.psa.catalogservice.impl.RefreshNsCustomerPriceCacheJobImpl">
+        <property name="refreshTaskExecutor" ref="refreshTaskExecutor"/>
+        <property name="cacheManager" ref="cacheManager"/>
+        <property name="nsDataSourceFactory" ref="nsDataSourceFactory"/>
+        <property name="dataSource" ref="dataSource"/>
+        <property name="catalogDao" ref="catalogDao"/>
+        <property name="cacheFileManager" ref="cacheFileManager"/>
+        <property name="customerCopyDef" ref="customerCopyDef"/>
+        <property name="itemCopyDef" ref="itemCopyDef"/>
+        <property name="customerPriceCopyDef" ref="customerPriceCopyDef"/>
+    </bean>
+
+    <bean id="dataSource" class="org.apache.commons.dbcp2.BasicDataSource">
+        <property name="username" value="suite"/>
+        <property name="password" value="Ball00ns"/>
         <property name="url" value="${dbUrl}"/>
         <property name="driverClassName" value="org.postgresql.Driver"/>
-        <!--<property name="suppressClose" value="true"/>-->
         <property name="defaultAutoCommit" value="false"/>
     </bean>
 
+    <bean id="nsDriver" class="${nsJdbcDriverClass}"/>
 
+    <bean id="nsDataSourceFactory" class="com.suitesoftware.psa.catalogservice.impl.NsDataSourceFactoryImpl">
+        <property name="nsDriver" ref="nsDriver"/>
+        <property name="nsJdbcHost" value="${nsJdbcHost}"/>
+        <property name="nsJdbcPort" value="${nsJdbcPort}"/>
+        <property name="nsUrlTemplate" value="${nsUrlTemplate}"/>
+        <property name="nsJdbcAccountId" value="${nsJdbcAccountId}"/>
+        <property name="nsJdbcDataSource" value="${nsJdbcDataSource}"/>
+        <property name="nsJdbcDriverClass" value="${nsJdbcDriverClass}"/>
+        <property name="nsAdminName" value="${nsJdbcAdminName}"/>
+        <property name="nsAdminPassword" value="${nsJdbcAdminPassword}"/>
+        <property name="nsAdminRole" value="${nsJdbcAdminRole}"/>
+    </bean>
 </beans>

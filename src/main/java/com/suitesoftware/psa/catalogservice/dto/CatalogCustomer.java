@@ -1,4 +1,4 @@
-package com.suitesoftware.psa.catalogservice;
+package com.suitesoftware.psa.catalogservice.dto;
 
 /**
  * User: lrb
@@ -57,6 +57,10 @@ public class CatalogCustomer {
 
     public String getPriceListAccessKey() {
         return priceListAccessKey;
+    }
+
+    public Boolean isCaching() {
+        return priceListAccessKey != null && priceListAccessKey.length() > 0;
     }
 
     public void setPriceListAccessKey(String priceListAccessKey) {

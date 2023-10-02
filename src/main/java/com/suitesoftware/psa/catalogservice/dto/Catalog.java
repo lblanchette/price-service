@@ -1,4 +1,4 @@
-package com.suitesoftware.psa.catalogservice;
+package com.suitesoftware.psa.catalogservice.dto;
 
 /**
  * User: lrb
@@ -28,6 +28,9 @@ public class Catalog {
     @XmlAttribute
     int customerId;
 
+    @XmlAttribute
+    String modifiedSince;
+
     String message;
 
     PartList partList;
@@ -40,6 +43,14 @@ public class Catalog {
 
     public void setCustomerId(int customerId) {
         this.customerId = customerId;
+    }
+
+    public String getModifiedSince() {
+        return modifiedSince;
+    }
+
+    public void setModifiedSince(String modifiedSince) {
+        this.modifiedSince = modifiedSince;
     }
 
     public void setMessage(String message) {

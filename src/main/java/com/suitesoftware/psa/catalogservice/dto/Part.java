@@ -1,13 +1,8 @@
-package com.suitesoftware.psa.catalogservice;
+package com.suitesoftware.psa.catalogservice.dto;
 
 
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlType;
+import javax.xml.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.Date;
 
@@ -20,40 +15,34 @@ import java.util.Date;
 
 @XmlType(namespace="http://com.psasecurity")
 @XmlRootElement(name="part")
-@XmlAccessorType(XmlAccessType.FIELD)
+@XmlAccessorType(XmlAccessType.PROPERTY)
 
 public class Part {
 
-    @XmlAttribute
     private int id;
 
-    @XmlElement(required=false, nillable = true)
     private String vendor;
 
-    @XmlElement(required=false, nillable = true)
     private String manPartNo;
 
-    @XmlElement(required=false, nillable = true)
     private String man;
 
-    @XmlElement(required=true, nillable = false)
     private String partNo;
 
-    @XmlElement(required=true, nillable = false)
-    private BigDecimal price;
+    private BigDecimal basePrice;
 
-    @XmlElement(required=false, nillable = true)
     private String desc;
 
-    @XmlElement(required=false, nillable = true)
     private Double msrp;
 
-    @XmlElement(required=false, nillable = true)
     private boolean discontinue;
 
-    @XmlElement(required=true, nillable = false)
     private Date lastModified;
 
+    private BigDecimal customerPrice;
+    private Date customerPriceLastModified;
+
+    @XmlAttribute
     public int getId() {
         return id;
     }
@@ -95,11 +84,11 @@ public class Part {
     }
 
     public BigDecimal getPrice() {
-        return price;
+        return customerPrice != null ? customerPrice : basePrice;
     }
 
     public void setPrice(BigDecimal price) {
-        this.price = price;
+        this.basePrice = price;
     }
 
     public String getDesc() {
@@ -127,11 +116,41 @@ public class Part {
     }
 
     public Date getLastModified() {
+        if(customerPriceLastModified != null) {
+            if(lastModified != null) {
+                return customerPriceLastModified.getTime() > lastModified.getTime() ? customerPriceLastModified : lastModified;
+            }
+            return customerPriceLastModified;
+        }
         return lastModified;
     }
 
     public void setLastModified(Date lastModified) {
         this.lastModified = lastModified;
+    }
+
+    @XmlTransient
+    public BigDecimal getCustomerPrice() {
+        return customerPrice;
+    }
+    public void setCustomerPrice(BigDecimal customerPrice) {
+        this.customerPrice = customerPrice;
+    }
+
+    @XmlTransient
+    public BigDecimal getBasePrice() {
+        return basePrice;
+    }
+    public void setBasePrice(BigDecimal price) {
+        this.basePrice = price;
+    }
+
+    @XmlTransient
+    public Date getCustomerPriceLstModified() {
+        return customerPriceLastModified;
+    }
+    public void setCustomerPriceLastModified(Date customerPriceLastModified) {
+        this.customerPriceLastModified = customerPriceLastModified;
     }
 
     public boolean changed(Part part) {
@@ -143,9 +162,8 @@ public class Part {
         if (manPartNo != null ? !manPartNo.equals(part.manPartNo) : part.manPartNo != null) return true;
         if (msrp != null ? !msrp.equals(part.msrp) : part.msrp != null) return true;
         if (partNo != null ? !partNo.equals(part.partNo) : part.partNo != null) return true;
-        if (price != null ? !price.equals(part.price) : part.price != null) return true;
+        if (basePrice != null ? !basePrice.equals(part.basePrice) : part.basePrice != null) return true;
         if (vendor != null ? !vendor.equals(part.vendor) : part.vendor != null) return true;
         return false;
     }
-
 }
