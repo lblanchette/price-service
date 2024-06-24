@@ -19,7 +19,9 @@ public interface CatalogManager {
     void insertRequestLog(int customerId, String status, String response, int bytes) throws CatalogException;
 
     void refreshCustomerPrices(Integer customerId) throws Exception;
-
+/*
+    void refreshCustomers() throws Exception;
+*/
     String getAccessReport(Integer customerId, Date asOfDate);
 
     void compareCustomerPrices();

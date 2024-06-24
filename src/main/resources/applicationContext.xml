@@ -46,6 +46,8 @@
             <value><![CDATA[
                 SELECT
                     customer_id,
+                    parent_id,
+                    isinactive,
                     "name",
                     companyname,
                     multiple_price_id,
@@ -112,7 +114,6 @@
                     IP.CURRENCY_ID = 1 AND
                     IP.ITEM_PRICE_ID = CGP.PRICE_TYPE_ID AND
                     IP.ITEM_ID = CUSTOMER_PRICES.ID
-
             ]]></value>
         </property>
 
@@ -400,6 +401,8 @@
             <value><![CDATA[
                 SELECT
                     customer_id,
+                    parent_id,
+                    isinactive,
                     "name",
                     companyname,
                     multiple_price_id,
@@ -592,6 +595,8 @@
             <value><![CDATA[
                 SELECT
                     customer_id,
+                    parent_id,
+                    isinactive,
                     "name",
                     companyname,
                     multiple_price_id,
@@ -606,6 +611,8 @@
             <value><![CDATA[
                 SELECT
                     customer_id,
+                    parent_id,
+                    isinactive,
                     "name",
                     companyname,
                     multiple_price_id,
@@ -701,6 +708,8 @@
             <value><![CDATA[
                 (
                     CUSTOMER_ID INTEGER NOT NULL,
+                    PARENT_ID INTEGER,
+                    ISINACTIVE VARCHAR(3),
                     NAME VARCHAR(100),
                     COMPANYNAME VARCHAR(100),
                     MULTIPLE_PRICE_ID INTEGER,
@@ -726,6 +735,16 @@
                     <property name="asName" value="customer_id"/>
                     <property name="type" value="1"/>
                     <property name="sortKey" value="true"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="PARENT_ID"/>
+                    <property name="asName" value="parent_id"/>
+                    <property name="type" value="1"/>
+                </bean>
+                <bean class="com.suitesoftware.dbcopy.ColCopyDef">
+                    <property name="name" value="ISINACTIVE"/>
+                    <property name="asName" value="isinactive"/>
+                    <property name="type" value="2"/>
                 </bean>
                 <bean class="com.suitesoftware.dbcopy.ColCopyDef">
                     <property name="name" value="NAME"/>
@@ -880,6 +899,22 @@
                 DELETE FROM xfer_customer_item_prices WHERE customer_id = :customerId
             ]]></value>
         </property>
+
+
+<!--        <property name="selectAllNsCustomersSql">-->
+<!--            <value><![CDATA[-->
+<!--                SELECT-->
+<!--                    customer_id,-->
+<!--                    parent_id,-->
+<!--                    "name",-->
+<!--                    companyname,-->
+<!--                    multiple_price_id,-->
+<!--                    price_list_access_key-->
+<!--                FROM customers-->
+<!--                WHERE-->
+<!--                    ISINACTIVE = 'No'-->
+<!--           ]]></value>-->
+<!--        </property>-->
 
         <property name="selectSql">
             <value><![CDATA[

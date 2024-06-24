@@ -1,5 +1,8 @@
 logs
 conf
+prod
+base-src
+psa_cache
 price-service.iml
 work
 price-service.ipr

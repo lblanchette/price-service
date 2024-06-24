@@ -284,6 +284,19 @@ public class CatalogManagerImpl implements CatalogManager {
             log.warn(ex.getMessage(),ex);
         }
     }
+/*
+    @Override
+    public void refreshCustomers()  {
+        try {
+            log.info("Start refresh");
+
+            RefreshNsCustomerPriceCacheJob job = applicationContext.getBean(RefreshNsCustomerPriceCacheJob.class);
+            job.startRefresh();
+        } catch(Throwable ex) {
+            log.warn(ex.getMessage(),ex);
+        }
+    }
+*/
 
 
     public void compareCustomerPrices()  {

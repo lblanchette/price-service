@@ -9,6 +9,8 @@ package com.suitesoftware.psa.catalogservice.dto;
 public class CatalogCustomer {
 
     Integer customerId;
+    Integer parentId;
+    String isInactive;
     String name;
     String companyname;
     Integer multiplePriceId;
@@ -21,6 +23,22 @@ public class CatalogCustomer {
 
     public void setCustomerId(Integer customerId) {
         this.customerId = customerId;
+    }
+
+    public Integer getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(Integer parentId) {
+        this.parentId = parentId;
+    }
+
+    public String getIsInactive() {
+        return isInactive;
+    }
+
+    public void setIsInactive(String isInactive) {
+        this.isInactive = isInactive;
     }
 
     public String getName() {

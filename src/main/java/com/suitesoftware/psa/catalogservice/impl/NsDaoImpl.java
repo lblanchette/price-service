@@ -28,6 +28,7 @@ public class NsDaoImpl implements com.suitesoftware.psa.catalogservice.NsDao {
     String selectNsCatalogCustomersSql;
     String selectNsBasePartsSql;
     String selectNsCustomerPricesSql;
+//    String selectAllNsCustomersSql;
 
     public String getSelectNsCatalogCustomerSql() {
         return selectNsCatalogCustomerSql;
@@ -61,6 +62,14 @@ public class NsDaoImpl implements com.suitesoftware.psa.catalogservice.NsDao {
         this.selectNsCustomerPricesSql = selectNsCustomerPricesSql;
     }
 
+//    public String getSelectAllNsCustomersSql() {
+//        return selectAllNsCustomersSql;
+//    }
+//
+//    public void setSelectAllCustomersSql(String selectAllNsCustomersSql) {
+//        this.selectAllNsCustomersSql = selectAllNsCustomersSql;
+//    }
+
     public void setDatasource(DataSource datasource) {
         this.datasourceTL.set(datasource);
     }
@@ -92,6 +101,14 @@ public class NsDaoImpl implements com.suitesoftware.psa.catalogservice.NsDao {
                 new BeanPropertyRowMapper<Part>(Part.class));
     }
 
+/*
+    @Override
+    public List<CatalogCustomer> getAllCustomers() {
+        SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        return jdbcTemplate.query(getSelectAllNsCustomersSql(),new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class),new HashMap<>());
+    }
+*/
     @Override
     public void assignCustomerPrices(Map<Integer, Part> partMap, int customerId) {
         SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());

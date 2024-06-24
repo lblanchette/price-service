@@ -250,6 +250,27 @@ public class CatalogService {
             throw new Exception("Error processing request: " + ex.getMessage(),ex);
         }
     }
+/*
+    @GET
+    @Path("admin/refresh/customers")
+    @Produces("text/plain")
+    public String refreshCustomers( @QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
+        try {
+            log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey );
+            if(accessKey == null && headerAccessKey == null) {
+                throw new Exception("Access key is required");
+            }
+            if(!getAccessManager().grantAdminAccess(accessKey != null ? accessKey : headerAccessKey)) {
+                throw new Exception("Access denied.  The access key provided is not authorized to access the requested resource");
+            }
+            getCatalogManager().refreshCustomers();
+            return "OK\n";
+        } catch (Throwable ex) {
+            log.error("Error processing request: " + ex.getMessage(),ex);
+            throw new Exception("Error processing request: " + ex.getMessage(),ex);
+        }
+    }
+*/
 
     @GET
     @Path("{customerId : \\d+}/part/{partId : \\d+}")

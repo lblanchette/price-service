@@ -13,5 +13,5 @@ public interface NsCatalogManager {
 
     List<Part> getCustomerParts(int customerId);
 
-//    void generateCustomerCatalogCache();
+    //    void generateCustomerCatalogCache();
 }
