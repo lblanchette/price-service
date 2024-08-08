@@ -2,7 +2,7 @@ package com.suitesoftware.psa.catalogservice.dto;
 
 
 
-import javax.xml.bind.annotation.*;
+import jakarta.xml.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.Date;
 

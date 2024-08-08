@@ -40,9 +40,10 @@
     </bean>
 
     <bean id="catalogDao" class="com.suitesoftware.psa.catalogservice.impl.CatalogDaoImpl">
+
         <property name="dataSource" ref="dataSource"/>
 
-        <property name="selectNsCatalogCustomersSql">
+        <property name="selectNsCustomersSql">
             <value><![CDATA[
                 SELECT
                     customer_id,
@@ -327,18 +328,6 @@
         </property>
 
 
-        <property name="queryCacheCustomerItemPricesSql">
-            <value><![CDATA[
-                SELECT
-                    id,
-                    price,
-                    last_modified
-                FROM
-                    cache_customer_item_prices
-                where customer_id = :customerId
-            ]]></value>
-        </property>
-
         <property name="insertCustomerPriceSql">
             <value><![CDATA[
             INSERT INTO customer_prices(
@@ -400,7 +389,8 @@
         <property name="getCatalogCustomerSql">
             <value><![CDATA[
                 SELECT
-                    customer_id,
+                    id,
+                    account_id,
                     parent_id,
                     isinactive,
                     "name",
@@ -408,11 +398,40 @@
                     multiple_price_id,
                     old_id,
                     price_list_access_key
-                FROM customers
+                FROM cache_customers
                 WHERE
-                    customer_id = :customerId
+                    id = :id and account_id = :accountId
            ]]></value>
         </property>
+
+
+        <property name="catalogCustomersSql">
+            <value><![CDATA[
+                SELECT
+                    id,
+                    account_id,
+                    parent_id,
+                    isinactive,
+                    "name",
+                    companyname,
+                    multiple_price_id,
+                    price_list_access_key
+                FROM cache_customers
+                WHERE account_id = :accountId
+           ]]></value>
+        </property>
+        <property name="queryCacheCustomerItemPricesSql">
+            <value><![CDATA[
+                SELECT
+                    id,
+                    price,
+                    last_modified
+                FROM
+                    cache_customer_item_prices
+                where customer_id = :customerId and account_id = :accountId
+            ]]></value>
+        </property>
+
 
         <property name="getCacheCustomerPartsSql">
             <value><![CDATA[
@@ -433,9 +452,9 @@
                         PRICE,
                         LAST_MODIFIED
                         FROM CACHE_CUSTOMER_ITEM_PRICES
-                        WHERE CUSTOMER_ID = :customerId )
+                        WHERE CUSTOMER_ID = :customerId AND ACCOUNT_ID = :accountId)
                     AS CIP ON CI.ID = CIP.ID
-                WHERE DISCONTINUE = FALSE
+                WHERE DISCONTINUE = FALSE AND ACCOUNT_ID = :accountId
            ]]></value>
         </property>
 
@@ -453,31 +472,33 @@
                     LAST_MODIFIED,
                     PRICE
                 FROM CACHE_ITEMS CI
+                where ACCOUNT_ID = :accountId
            ]]></value>
         </property>
 
         <property name="upsertCustomerPricesSql">
             <value><![CDATA[
                 WITH CHANGED_PRICES AS
-                    (SELECT ID,  PRICE
+                    (SELECT ACCOUNT_ID, ID,  PRICE
                         FROM XFER_CUSTOMER_ITEM_PRICES
-                        WHERE CUSTOMER_ID = :customerId
+                        WHERE CUSTOMER_ID = :customerId and ACCOUNT_ID = :accountId
 
                         EXCEPT
 
-                        SELECT CACHE_CUSTOMER_ITEM_PRICES.ID, CACHE_CUSTOMER_ITEM_PRICES.PRICE
+                     SELECT CACHE_CUSTOMER_ITEM_PRICES.ACCOUNT_ID, CACHE_CUSTOMER_ITEM_PRICES.ID, CACHE_CUSTOMER_ITEM_PRICES.PRICE
                         FROM CACHE_CUSTOMER_ITEM_PRICES
-                        WHERE CUSTOMER_ID = :customerId )
+                        WHERE CUSTOMER_ID = :customerId and ACCOUNT_ID = :accountId)
 
                 INSERT INTO CACHE_CUSTOMER_ITEM_PRICES
-                    (ID, CUSTOMER_ID, PRICE, LAST_MODIFIED)
+                    (ACCOUNT_ID, ID, CUSTOMER_ID, PRICE, LAST_MODIFIED)
                 SELECT
+                    :accountId,
                     CHANGED_PRICES.ID,
                     :customerId,
                     CHANGED_PRICES.PRICE,
                     NOW()
                 FROM CHANGED_PRICES
-                ON CONFLICT(ID, CUSTOMER_ID) DO UPDATE
+                ON CONFLICT(ACCOUNT_ID, ID, CUSTOMER_ID) DO UPDATE
                     SET
                         PRICE = EXCLUDED.PRICE,
                         LAST_MODIFIED = NOW()
@@ -487,11 +508,13 @@
         <property name="discontinueCustomerPricesSql">
             <value><![CDATA[
                 WITH DISC_ITEMS AS
-                    (SELECT ID
+                    (SELECT ACCOUNT_ID, ID
                         FROM CACHE_CUSTOMER_ITEM_PRICES
-                        EXCEPT SELECT ID
+                        WHERE ACCOUNT_ID = :accountId
+                        EXCEPT
+                     SELECT ACCOUNT_ID, ID
                         FROM CACHE_ITEMS
-                        WHERE DISCONTINUE = FALSE )
+                        WHERE DISCONTINUE = FALSE AND ACCOUNT_ID = :accountId)
                 DELETE
                 FROM CACHE_CUSTOMER_ITEM_PRICES USING DISC_ITEMS
                 WHERE DISC_ITEMS.ID = CACHE_CUSTOMER_ITEM_PRICES.ID
@@ -507,6 +530,7 @@
             <value><![CDATA[
              WITH CHANGED_ITEMS AS
                 (SELECT
+                        ACCOUNT_ID,
                         ID,
                         VENDOR,
                         MAN_PART_NO,
@@ -517,10 +541,12 @@
                         MSRP,
                         false AS DISCONTINUE
                     FROM XFER_ITEMS
+                    WHERE ACCOUNT_ID = :accountId
 
                     EXCEPT
 
                     SELECT
+                        ACCOUNT_ID,
                         ID,
                         VENDOR,
                         MAN_PART_NO,
@@ -531,10 +557,12 @@
                         MSRP,
                         DISCONTINUE
                     FROM CACHE_ITEMS
+                    WHERE ACCOUNT_ID = :accountId
                 )
             INSERT INTO CACHE_ITEMS
-                (ID, VENDOR, MAN_PART_NO, MAN, PART_NO, PRICE, "desc", MSRP, DISCONTINUE, LAST_MODIFIED)
+                (ACCOUNT_ID, ID, VENDOR, MAN_PART_NO, MAN, PART_NO, PRICE, "desc", MSRP, DISCONTINUE, LAST_MODIFIED)
                 SELECT
+                    CHANGED_ITEMS.ACCOUNT_ID,
                     CHANGED_ITEMS.ID,
                     CHANGED_ITEMS.VENDOR,
                     CHANGED_ITEMS.MAN_PART_NO,
@@ -546,7 +574,7 @@
                     CHANGED_ITEMS.DISCONTINUE,
                     NOW()
                 FROM CHANGED_ITEMS
-                ON CONFLICT(ID) DO UPDATE
+                ON CONFLICT(ACCOUNT_ID,ID) DO UPDATE
                     SET
                     VENDOR = EXCLUDED.VENDOR,
                     MAN_PART_NO = EXCLUDED.MAN_PART_NO,
@@ -563,18 +591,78 @@
         <property name="discontinueCacheItemsSql">
             <value><![CDATA[
                 WITH IDS AS
-                    (SELECT ID
+                    (SELECT ACCOUNT_ID, ID
                         FROM CACHE_ITEMS
                         WHERE DISCONTINUE = FALSE
-                        EXCEPT SELECT ID
-                        FROM XFER_ITEMS)
+                        EXCEPT
+                        SELECT ACCOUNT_ID, ID
+                        FROM XFER_ITEMS WHERE ACCOUNT_ID = :accountId)
                 UPDATE CACHE_ITEMS
                 SET DISCONTINUE = TRUE,
                     LAST_MODIFIED = NOW()
                 FROM IDS
-                WHERE CACHE_ITEMS.ID = IDS.ID
+                WHERE CACHE_ITEMS.ID = IDS.ID AND CACHE_ITEMS.ACCOUNT_ID = IDS.ACCOUNT_ID
            ]]></value>
         </property>
+
+        <!--
+ - this adds or updates cache_items
+ - price is the "online price
+-->
+<!--        <property name="upsertCacheCustomersSql">-->
+<!--            <value><![CDATA[-->
+<!--             WITH CHANGED_CUSTOMERS AS-->
+<!--                (-->
+<!--                 SELECT * FROM XFER_CUSTOMERS WHERE ACCOUNT_ID = :accountId-->
+<!--                    EXCEPT-->
+<!--                 SELECT * FROM CACHE_CUSTOMERS WHERE ACCOUNT_ID = :accountId-->
+<!--                )-->
+<!--            INSERT INTO CACHE_CUSTOMERS-->
+<!--                (ACCOUNT_ID, ID, VENDOR, MAN_PART_NO, MAN, PART_NO, PRICE, "desc", MSRP, DISCONTINUE, LAST_MODIFIED)-->
+<!--                SELECT-->
+<!--                    CHANGED_ITEMS.ACCOUNT_ID,-->
+<!--                    CHANGED_ITEMS.ID,-->
+<!--                    CHANGED_ITEMS.VENDOR,-->
+<!--                    CHANGED_ITEMS.MAN_PART_NO,-->
+<!--                    CHANGED_ITEMS.MAN,-->
+<!--                    CHANGED_ITEMS.PART_NO,-->
+<!--                    CHANGED_ITEMS.PRICE,-->
+<!--                    CHANGED_ITEMS."desc",-->
+<!--                    CHANGED_ITEMS.MSRP,-->
+<!--                    CHANGED_ITEMS.DISCONTINUE,-->
+<!--                    NOW()-->
+<!--                FROM CHANGED_ITEMS-->
+<!--                ON CONFLICT(ACCOUNT_ID,ID) DO UPDATE-->
+<!--                    SET-->
+<!--                    VENDOR = EXCLUDED.VENDOR,-->
+<!--                    MAN_PART_NO = EXCLUDED.MAN_PART_NO,-->
+<!--                    MAN = EXCLUDED.MAN,-->
+<!--                    PART_NO = EXCLUDED.PART_NO,-->
+<!--                    PRICE = EXCLUDED.PRICE,-->
+<!--                    "desc" = EXCLUDED."desc",-->
+<!--                    MSRP = EXCLUDED.MSRP,-->
+<!--                    DISCONTINUE = EXCLUDED.DISCONTINUE,-->
+<!--                    LAST_MODIFIED = NOW()-->
+<!--           ]]></value>-->
+<!--        </property>-->
+
+<!--        <property name="discontinueCacheItemsSql">-->
+<!--            <value><![CDATA[-->
+<!--                WITH IDS AS-->
+<!--                    (SELECT ACCOUNT_ID, ID-->
+<!--                        FROM CACHE_ITEMS-->
+<!--                        WHERE DISCONTINUE = FALSE-->
+<!--                        EXCEPT-->
+<!--                        SELECT ACCOUNT_ID, ID-->
+<!--                        FROM XFER_ITEMS WHERE ACCOUNT_ID = :accountId)-->
+<!--                UPDATE CACHE_ITEMS-->
+<!--                SET DISCONTINUE = TRUE,-->
+<!--                    LAST_MODIFIED = NOW()-->
+<!--                FROM IDS-->
+<!--                WHERE CACHE_ITEMS.ID = IDS.ID AND CACHE_ITEMS.ACCOUNT_ID = IDS.ACCOUNT_ID-->
+<!--           ]]></value>-->
+<!--        </property>-->
+
 
         <property name="requestLogReportSql">
             <value><![CDATA[
@@ -591,23 +679,7 @@
 
     <bean id="nsDao" class="com.suitesoftware.psa.catalogservice.impl.NsDaoImpl">
 
-        <property name="selectNsCatalogCustomerSql">
-            <value><![CDATA[
-                SELECT
-                    customer_id,
-                    parent_id,
-                    isinactive,
-                    "name",
-                    companyname,
-                    multiple_price_id,
-                    price_list_access_key
-                FROM customers
-                WHERE
-                    customer_id = :customerId
-           ]]></value>
-        </property>
-
-        <property name="selectNsCatalogCustomersSql">
+        <property name="selectNsCustomersSql">
             <value><![CDATA[
                 SELECT
                     customer_id,
@@ -698,16 +770,17 @@
 
     </bean>
 
-    <bean id="nsCatalogManager" class="com.suitesoftware.psa.catalogservice.impl.NsCatalogManagerImpl">
-        <property name="nsDataSourceFactory" ref="nsDataSourceFactory"/>
-        <property name="nsDao" ref="nsDao"/>
-    </bean>
+<!--    <bean id="nsCatalogManager" class="com.suitesoftware.psa.catalogservice.impl.NsCatalogManagerImpl_XXX">-->
+<!--        <property name="nsDataSourceFactory" ref="nsDataSourceFactory"/>-->
+<!--        <property name="nsDao" ref="nsDao"/>-->
+<!--    </bean>-->
 
     <bean id="customersDll" class="com.suitesoftware.dbcopy.DdlDef">
         <property name="createDdl">
             <value><![CDATA[
                 (
-                    CUSTOMER_ID INTEGER NOT NULL,
+                    ACCOUNT_ID VARCHAR(50) NOT NULL,
+                    ID INTEGER NOT NULL,
                     PARENT_ID INTEGER,
                     ISINACTIVE VARCHAR(3),
                     NAME VARCHAR(100),
@@ -718,21 +791,25 @@
                 )
             ]]></value>
         </property>
-        <property name="primaryKey">
-            <value><![CDATA[CUSTOMER_ID]]></value>
-        </property>
+        <property name="primaryKey" value="ACCOUNT_ID,ID"/>
     </bean>
 
     <bean id="customerCopyDef" class="com.suitesoftware.dbcopy.CopyDef">
         <property name="srcTable" value="CUSTOMERS"/>
-        <property name="dstTable" value="CUSTOMERS"/>
+        <property name="dstTable" value="xfer_customers"/>
+        <property name="prepSql">
+            <value><![CDATA[
+                DELETE FROM xfer_customers WHERE account_id = :accountId
+            ]]></value>
+        </property>
         <property name="useTemp" value="true"/>
+        <property name="addAccountId"   value="true"/>
         <property name="ddlDef" ref="customersDll"/>
         <property name="columns">
             <list>
                 <bean class="com.suitesoftware.dbcopy.ColCopyDef">
                     <property name="name" value="CUSTOMER_ID"/>
-                    <property name="asName" value="customer_id"/>
+                    <property name="asName" value="id"/>
                     <property name="type" value="1"/>
                     <property name="sortKey" value="true"/>
                 </bean>
@@ -781,6 +858,7 @@
     <bean id="itemCopyDef" class="com.suitesoftware.dbcopy.CopyDef">
         <property name="srcTable" value="items selectSql"/>
         <property name="dstTable" value="xfer_items"/>
+        <property name="addAccountId"   value="true"/>
         <property name="columns">
             <list value-type="com.suitesoftware.dbcopy.ColCopyDef">
                 <bean class="com.suitesoftware.dbcopy.ColCopyDef">
@@ -829,6 +907,7 @@
         <property name="selectSql">
             <value><![CDATA[
                 SELECT
+                    :accountId as ACCOUNT_ID,
                     I.ITEM_ID AS id,
                     V.FULL_NAME AS vendor,
                     I.VENDORNAME AS man_part_no,
@@ -854,6 +933,7 @@
                 <property name="createDdl">
                     <value><![CDATA[
                         (
+                            account_id character varying(50) NOT NULL COLLATE pg_catalog."default",
                             id integer NOT NULL,
                             price numeric(22,2),
                             man_part_no character varying(100) COLLATE pg_catalog."default",
@@ -865,7 +945,7 @@
                         )
                     ]]></value>
                 </property>
-                <property name="primaryKey" value="id"/>
+                <property name="primaryKey" value="account_id,id"/>
             </bean>
         </property>
     </bean>
@@ -874,6 +954,7 @@
     <bean id="customerPriceCopyDef" class="com.suitesoftware.dbcopy.CopyDef">
         <property name="srcTable" value="customer prices selectSql"/>
         <property name="dstTable" value="xfer_customer_item_prices"/>
+        <property name="addAccountId"   value="true"/>
         <property name="columns">
             <list value-type="com.suitesoftware.dbcopy.ColCopyDef">
                 <bean class="com.suitesoftware.dbcopy.ColCopyDef">
@@ -896,30 +977,14 @@
         <property name="useTemp" value="false"/>
         <property name="prepSql">
             <value><![CDATA[
-                DELETE FROM xfer_customer_item_prices WHERE customer_id = :customerId
+                DELETE FROM xfer_customer_item_prices WHERE customer_id = :customerId and account_id = :accountId
             ]]></value>
         </property>
-
-
-<!--        <property name="selectAllNsCustomersSql">-->
-<!--            <value><![CDATA[-->
-<!--                SELECT-->
-<!--                    customer_id,-->
-<!--                    parent_id,-->
-<!--                    "name",-->
-<!--                    companyname,-->
-<!--                    multiple_price_id,-->
-<!--                    price_list_access_key-->
-<!--                FROM customers-->
-<!--                WHERE-->
-<!--                    ISINACTIVE = 'No'-->
-<!--           ]]></value>-->
-<!--        </property>-->
 
         <property name="selectSql">
             <value><![CDATA[
 
-        SELECT :customerId AS CUSTOMER_ID, I.ITEM_ID AS ID, COALESCE(IP.PRICE, GP.PRICE, CL.PRICE) AS PRICE
+        SELECT :accountId as ACCOUNT_ID, :customerId AS CUSTOMER_ID, I.ITEM_ID AS ID, COALESCE(IP.PRICE, GP.PRICE, CL.PRICE) AS PRICE
 
         FROM ITEMS I
 
@@ -962,13 +1027,14 @@
                 <property name="createDdl">
                     <value><![CDATA[
                         (
+                            account_id character varying(50) NOT NULL COLLATE pg_catalog."default",
                             customer_id integer NOT NULL,
                             id integer NOT NULL,
                             price numeric(22,2)
                         )
                     ]]></value>
                 </property>
-                <property name="primaryKey" value="(customer_id,id)"/>
+                <property name="primaryKey" value="account_id,customer_id,id"/>
             </bean>
         </property>
     </bean>
@@ -979,7 +1045,7 @@
 
     <bean id="refreshTaskExecutor" class="org.springframework.core.task.SimpleAsyncTaskExecutor">
         <property name="ThreadNamePrefix" value="RefreshTask"/>
-        <property name="concurrencyLimit" value="0"/> <!-- no concurency for now -->
+        <property name="concurrencyLimit" value="1"/> <!-- no concurency for now -->
     </bean>
 
     <bean id="refreshNsCustomerPriceCacheJob" class="com.suitesoftware.psa.catalogservice.impl.RefreshNsCustomerPriceCacheJobImpl">

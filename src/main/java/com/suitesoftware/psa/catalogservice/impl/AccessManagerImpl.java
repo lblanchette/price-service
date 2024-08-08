@@ -1,7 +1,9 @@
 package com.suitesoftware.psa.catalogservice.impl;
 
 import com.suitesoftware.psa.catalogservice.AccessException;
+import com.suitesoftware.psa.catalogservice.dto.Catalog;
 import com.suitesoftware.psa.catalogservice.dto.CatalogCustomer;
+import com.suitesoftware.psa.catalogservice.dto.NsCustomer;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -56,7 +58,7 @@ public class AccessManagerImpl implements com.suitesoftware.psa.catalogservice.A
     public void grantCatalogAccess(CatalogCustomer customer, String key) throws AccessException {
 
         if(key.equals(customer.getPriceListAccessKey())) {
-            if(getCatalogDao().getAccessCount(customer.getCustomerId()) > getAccessLimit()) {
+            if(getCatalogDao().getAccessCount(customer.getId()) > getAccessLimit()) {
                 throw new AccessException("Access denied.  You have exceeded allowed usage for a 24 hour period.  customer ID: " + customer.getCustomerId());
             }
             return;

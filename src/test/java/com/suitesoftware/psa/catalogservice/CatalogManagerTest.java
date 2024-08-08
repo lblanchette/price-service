@@ -24,11 +24,11 @@ public class CatalogManagerTest {
     @Test
     public void testGetCatalogCustomer() {
 
-        when(catalogDao.getCustomer(5)).thenReturn(catalogCustomer5);
+        when(catalogDao.getCatalogCustomer("",5)).thenReturn(catalogCustomer5);
 
         CatalogManagerImpl catalogManager = new CatalogManagerImpl();
         catalogManager.setCatalogDao(catalogDao);
-        CatalogCustomer cc = catalogManager.getCustomer(5);
+        CatalogCustomer cc = catalogManager.getCatalogCustomer("",5);
         assertEquals(cc.getCustomerId(),5);
     }
 

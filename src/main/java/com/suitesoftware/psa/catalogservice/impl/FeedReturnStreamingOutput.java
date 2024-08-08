@@ -2,12 +2,13 @@ package com.suitesoftware.psa.catalogservice.impl;
 
 import com.suitesoftware.psa.catalogservice.dto.Catalog;
 import com.suitesoftware.psa.catalogservice.dto.Part;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
 
-import javax.ws.rs.core.StreamingOutput;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.Marshaller;
-import javax.xml.bind.Unmarshaller;
+import jakarta.ws.rs.core.StreamingOutput;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.OutputStream;
@@ -22,7 +23,8 @@ import java.util.List;
 
 public class FeedReturnStreamingOutput implements StreamingOutput {
 
-    private Logger log = Logger.getLogger(getClass());
+    private static final Logger log = LogManager.getLogger(FeedReturnStreamingOutput.class);
+
     File file;
     Date modifiedSince;
     public FeedReturnStreamingOutput(File file, Date modifiedSince) {

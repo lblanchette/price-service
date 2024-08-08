@@ -3,8 +3,8 @@ package com.suitesoftware.psa.catalogservice;
 import com.suitesoftware.psa.catalogservice.dto.Catalog;
 import com.suitesoftware.psa.catalogservice.dto.Part;
 import com.suitesoftware.psa.catalogservice.impl.CacheFileManagerImpl;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.ObjectWriter;
+//import org.codehaus.jackson.map.ObjectMapper;
+//import org.codehaus.jackson.map.ObjectWriter;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
@@ -94,10 +94,10 @@ public class PartChangeTest {
                     if (oldPart == null) {
                         System.out.println(newPart.getId() + ",old part not found");
                     } else if (oldPart.changed(newPart)) {
-                        ObjectWriter ow = new ObjectMapper().writer().withDefaultPrettyPrinter();
-                        System.out.println("OLD:\n" + ow.writeValueAsString(oldPart));
-                        System.out.println("NEW:\n" + ow.writeValueAsString(newPart));
-                        //System.out.println(oldPart.getId() + "," + oldPart.getPrice().toPlainString() + "," + newPart.getPrice().toPlainString());
+//                        ObjectWriter ow = new ObjectMapper().writer().withDefaultPrettyPrinter();
+//                        System.out.println("OLD:\n" + ow.writeValueAsString(oldPart));
+//                        System.out.println("NEW:\n" + ow.writeValueAsString(newPart));
+                        System.out.println(oldPart.getId() + "," + oldPart.getPrice().toPlainString() + "," + newPart.getPrice().toPlainString());
                     }
                 }
 //            }

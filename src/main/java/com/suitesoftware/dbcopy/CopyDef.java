@@ -16,10 +16,19 @@ public class CopyDef {
     String selectSql;
     String whereClause;
     String orderByClause;
+    Boolean addAccountId = false;
 
     DdlDef ddlDef;
 
     boolean useTemp = true;
+
+    public Boolean getAddAccountId() {
+        return addAccountId;
+    }
+
+    public void setAddAccountId(Boolean addAccountId) {
+        this.addAccountId = addAccountId;
+    }
 
     public String getSrcTable() {
         return srcTable;

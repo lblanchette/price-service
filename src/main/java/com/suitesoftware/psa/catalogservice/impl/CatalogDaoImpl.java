@@ -4,22 +4,28 @@ import com.suitesoftware.psa.catalogservice.dto.Catalog;
 import com.suitesoftware.psa.catalogservice.dto.CatalogCustomer;
 import com.suitesoftware.psa.catalogservice.dto.Part;
 import com.suitesoftware.psa.catalogservice.dto.PartList;
-import org.apache.log4j.Logger;
+import org.apache.commons.text.StringSubstitutor;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
-import org.springframework.jdbc.core.simple.SimpleJdbcTemplate;
+//import org.springframework.jdbc.core.simple.SimpleJdbcTemplate;
 
-import javax.sql.DataSource;
-import javax.xml.bind.JAXB;
+import jakarta.xml.bind.JAXB;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * User: lrb
@@ -28,13 +34,9 @@ import java.util.*;
  * (c) Copyright Suite Business Software
  */
 public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.CatalogDao {
+    private static final Logger log = LogManager.getLogger(CatalogDaoImpl.class);
 
-    private Logger log = Logger.getLogger(getClass());
-
-//    @Autowired
-//    private PlatformTransactionManager platformTransactionManager;
-
-    SimpleJdbcTemplate jdbcTemplate;
+    NamedParameterJdbcTemplate jdbcTemplate;
 
     DataSource dataSource;
 
@@ -53,13 +55,16 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     String insertCustomerPriceSql;
     String updateCustomerPriceSql;
     String discontinueCustomerPriceSql;
+    String catalogCustomersSql;
 
     String queryCachedCustomerPartsSql;
 
 
     String queryCustomerPriceListCacheQuerySql;
 
-    String updateCombinedCustomerPriceMapSql;
+    //String updateCombinedCustomerPriceMapSql;
+
+    String selectNsCustomersSql;
 
     String queryBasePartSql;
 
@@ -83,8 +88,24 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
 
     String requestLogReportSql;
 
+    public String getSelectNsCustomersSql() {
+        return selectNsCustomersSql;
+    }
+
+    public void setSelectNsCustomersSql(String selectNsCustomersSql) {
+        this.selectNsCustomersSql = selectNsCustomersSql;
+    }
+
+    public String getCatalogCustomersSql() {
+        return catalogCustomersSql;
+    }
+
+    public void setCatalogCustomersSql(String catalogCustomersSql) {
+        this.catalogCustomersSql = catalogCustomersSql;
+    }
+
     public void setDataSource(DataSource dataSource) {
-        jdbcTemplate = new SimpleJdbcTemplate(dataSource);
+        jdbcTemplate = new NamedParameterJdbcTemplate(dataSource);
         this.dataSource = dataSource;
     }
 
@@ -96,6 +117,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
         this.selectNsCatalogCustomersSql = selectNsCatalogCustomersSql;
     }
 
+/*
     public String getUpdateCombinedCustomerPriceMapSql() {
         return updateCombinedCustomerPriceMapSql;
     }
@@ -103,7 +125,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     public void setUpdateCombinedCustomerPriceMapSql(String updateCombinedCustomerPriceMapSql) {
         this.updateCombinedCustomerPriceMapSql = updateCombinedCustomerPriceMapSql;
     }
-
+*/
     public String getQueryBasePartSql() {
         return queryBasePartSql;
     }
@@ -312,7 +334,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     @Override
     public void deleteCustomerPrices(int customerId) {
         String sql = "DELETE FROM CUSTOMER_PRICES WHERE CUSTOMER_ID = " + customerId;
-        jdbcTemplate.update(sql);
+        jdbcTemplate.update(sql,new MapSqlParameterSource());
     }
 
 
@@ -354,7 +376,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
         cat.setPartList(new PartList());
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("customerId",customerId);
-        List<Part> parts = jdbcTemplate.query(getGetCustomerCatalogSql(),new BeanPropertyRowMapper<Part>(Part.class), params);
+        List<Part> parts = jdbcTemplate.query(getGetCustomerCatalogSql(), params, new BeanPropertyRowMapper<Part>(Part.class));
         cat.getPartList().setPart(parts);
         return cat;
     }
@@ -416,7 +438,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     @Override
     public void streamCachedCustomerPartsList(final OutputStream outputStream, int customerId, Date lastModified) {
 
-        String sql =  queryCachedCustomerPartsSql;
+        String sql = getQueryCachedCustomerPartsSql();
 
         MapSqlParameterSource sps = new MapSqlParameterSource();
         sps.addValue("customerId",customerId);
@@ -425,47 +447,12 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
             sql += " AND last_modified > :lastModified";
         }
         final BeanPropertyRowMapper<Part> partMapper = new BeanPropertyRowMapper<Part>(Part.class);
-        jdbcTemplate.getJdbcOperations().query(queryCachedCustomerPartsSql,new Object[] {customerId},new int [] {Types.INTEGER},new RowCallbackHandler() {
+        jdbcTemplate.getJdbcOperations().query(sql,new Object[] {customerId},new int [] {Types.INTEGER},new RowCallbackHandler() {
             @Override
             public void processRow(ResultSet rs) throws SQLException {
 
                 Part p = partMapper.mapRow(rs,1);
                 JAXB.marshal(p,outputStream);
-/*
-                Part cachePart = new Part();
-                cachePart.setId(rs.getInt("id"));
-                cachePart.setDiscontinue(rs.getBoolean("discontinue"));
-                cachePart.setDesc(rs.getString("desc"));
-                cachePart.setMan(rs.getString("man"));
-                cachePart.setManPartNo(rs.getString("man_part_no"));
-                cachePart.setMsrp(rs.getDouble("msrp"));
-                cachePart.setPartNo(rs.getString("part_no"));
-                cachePart.setPrice(rs.getBigDecimal("price"));
-                cachePart.setVendor(rs.getString("vendor"));
-
-                cachedPartIds.put(cachePart.getId(), null);
-
-                Part updatePart = basePartsMap.get(cachePart.getId());
-                if(updatePart == null) {
-                    if(!cachePart.isDiscontinue()) {
-                        discontinuedIdList.add(cachePart.getId());
-                    }
-                } else {
-                    BigDecimal updateCustPrice = customerPriceMap.get(cachePart.getId());
-                    if(updateCustPrice == null) {
-                        updateCustPrice =  updatePart.getPrice();
-                    }
-                    if (updateCustPrice != null ? !updateCustPrice.equals(cachePart.getPrice()) : cachePart.getPrice() != null) {
-                        changedIdList.add(updatePart.getId());
-                    } else {
-                        // already checked price, now check other stuff
-                        cachePart.setPrice(updatePart.getPrice());
-                        if(cachePart.changed(updatePart)) {
-                            changedIdList.add(updatePart.getId());
-                        }
-                    }
-                }
- */
             }
         });
     }
@@ -473,7 +460,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     @Override
     public List<Part> getCachedCustomerPartsList(int customerId, Date modifiedSince) {
 
-        String sql =  queryCachedCustomerPartsSql;
+        String sql =  getQueryCachedCustomerPartsSql();
 
         MapSqlParameterSource sps = new MapSqlParameterSource();
         sps.addValue("customerId",customerId);
@@ -482,30 +469,12 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
             sql += " AND last_modified > :modifiedSince";
         }
         sql += " order by partNo asc";
-        return jdbcTemplate.query(sql,new BeanPropertyRowMapper<Part>(Part.class),sps);
+        return jdbcTemplate.query(sql,sps,new BeanPropertyRowMapper<Part>(Part.class));
     }
-/*
-    public List<Part> getCachedCustomerPart(int customerId, int partId) {
-
-        String sql =  queryCachedCustomerPartsSql;
-
-        MapSqlParameterSource sps = new MapSqlParameterSource();
-        sps.addValue("customerId",customerId);
-        sps.addValue("id",partId);
-        sql += " AND id = :id";
-        return jdbcTemplate.query(sql,new BeanPropertyRowMapper<Part>(Part.class),sps);
-    }
-*/
 
     @Override
     public List<Part> getBasePriceList() throws Exception  {
-        return jdbcTemplate.query(queryBasePriceListSql,new BeanPropertyRowMapper<Part>(Part.class));
-
-//        String sql = queryBasePriceListSql;
-//        Map<String,String> paramMap = new HashMap<String, String>();
-//        paramMap.put("CUSTOMER_ID",""+customerId);
-//        sql = sqlParamSubst(paramMap,sql);
-//        jdbcTemplate.update(sql,paramMap);
+        return jdbcTemplate.query(getQueryBasePriceListSql(),new BeanPropertyRowMapper<Part>(Part.class));
     }
 
 
@@ -517,11 +486,6 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
                 return rs.getInt("customer_id");
             }
         });
-//        String sql = queryBasePriceListSql;
-//        Map<String,String> paramMap = new HashMap<String, String>();
-//        paramMap.put("CUSTOMER_ID",""+customerId);
-//        sql = sqlParamSubst(paramMap,sql);
-//        jdbcTemplate.update(sql,paramMap);
     }
 
     SqlParameterSource getPartSqlParams(int customerId, Part part, BigDecimal customerPrice) {
@@ -541,61 +505,24 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     }
 
     private void addParts(List<SqlParameterSource> spsList) {
-        jdbcTemplate.batchUpdate(insertCustomerPriceSql,spsList.toArray(new SqlParameterSource[spsList.size()]));
-    }
-
-    private void addPart(int customerId, Part part, BigDecimal customerPrice) {
-        SqlParameterSource sps = getPartSqlParams(customerId, part,customerPrice);
-        jdbcTemplate.update(insertCustomerPriceSql,sps);
+        jdbcTemplate.batchUpdate(getInsertCustomerPriceSql(),spsList.toArray(new SqlParameterSource[0]));
     }
 
     private void updateParts(List<SqlParameterSource> spsList) {
-        jdbcTemplate.batchUpdate(updateCustomerPriceSql,spsList.toArray(new SqlParameterSource[spsList.size()]));
-    }
-
-    private void updatePart(int customerId, Part part, BigDecimal customerPrice) {
-        SqlParameterSource sps = getPartSqlParams(customerId, part,customerPrice);
-        jdbcTemplate.update(updateCustomerPriceSql,sps);
+        jdbcTemplate.batchUpdate(getUpdateCustomerPriceSql(),spsList.toArray(new SqlParameterSource[0]));
     }
 
     private void discontinueParts(List<SqlParameterSource> spsList) {
-        jdbcTemplate.batchUpdate(discontinueCustomerPriceSql,spsList.toArray(new SqlParameterSource[spsList.size()]));
+        jdbcTemplate.batchUpdate(getDiscontinueCustomerPriceSql(),spsList.toArray(new SqlParameterSource[0]));
     }
 
-    private void discontinuePart(int customerId, int partId) {
-        MapSqlParameterSource msps = new MapSqlParameterSource();
-        msps.addValue("id",partId);
-        msps.addValue("customerId",customerId);
-        jdbcTemplate.update(discontinueCustomerPriceSql,msps);
-    }
-
-    /**
-     *
-     */
-/*
-    public void combinedCacheParts(int customerId) {
-
-        jdbcTemplate.getJdbcOperations().query(updateCombinedCustomerPriceMapSql,
-                new Object[] {customerId,customerId,customerId,customerId},
-                new int [] {Types.INTEGER,Types.INTEGER,Types.INTEGER,Types.INTEGER,},
-                new RowCallbackHandler() {
-                    public void processRow(ResultSet rs) throws SQLException {
-                        int id = rs.getInt("ITEM_ID");
-                        BigDecimal price = rs.getBigDecimal("price");
-                        System.out.println();
-                    }
-        });
-
-    }
-
-*/
     /**
      * update customer price cache based on comparison with new calculated values from
      * base + customerPriceMap
      *
-     * @param customerId
-     * @param basePartsMap
-     * @param customerPriceMap
+     * @param customerId customer
+     * @param basePartsMap base parts
+     * @param customerPriceMap customer prices
      */
     @Override
     public void updateCustomerCacheParts(int customerId, final Map<Integer, Part> basePartsMap, final Map<Integer, BigDecimal> customerPriceMap) {
@@ -604,11 +531,8 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
         final List<Integer> discontinuedIdList = new LinkedList<Integer>();
         final Map<Integer,Object> cachedPartIds = new HashMap<Integer, Object>(basePartsMap.size());
 
-        final BeanPropertyRowMapper<Part> partMapper = new BeanPropertyRowMapper<Part>(Part.class);
-
         log.info("updateCustomerCacheParts: start");
-
-        /**
+        /*
          * this is to be replaced
          */
         jdbcTemplate.getJdbcOperations().query(getQueryCustomerPriceListCacheQuerySql(),new Object[] {customerId},new int [] {Types.INTEGER},new RowCallbackHandler() {
@@ -650,10 +574,6 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
                 }
             }
         });
-//        if(true) {
-//            throw new Error("Test error");
-//        }
-
         List<SqlParameterSource> psList = new LinkedList<SqlParameterSource>();
 
         for(Integer partId : basePartsMap.keySet()) {
@@ -662,16 +582,15 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
             }
         }
         log.info("updateCustomerCacheParts: add parts " + psList.size());
-        if(psList.size() > 0) {
+        if(!psList.isEmpty()) {
             addParts(psList);
             psList.clear();
         }
         for(Integer partId : changedIdList) {
             psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
-            //updatePart(customerId, basePartsMap.get(partId), customerPriceMap.get(partId));
         }
         log.info("updateCustomerCacheParts: update parts " + psList.size());
-        if(psList.size() > 0) {
+        if(!psList.isEmpty()) {
             updateParts(psList);
             psList.clear();
         }
@@ -680,11 +599,9 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
             msps.addValue("id",partId);
             msps.addValue("customerId",customerId);
             psList.add(msps);
-//            psList.add(getPartSqlParams(customerId, basePartsMap.get(partId),customerPriceMap.get(partId)));
-//            discontinuePart(customerId,partId);
         }
         log.info("updateCustomerCacheParts: discontinue parts " + psList.size());
-        if(psList.size() > 0) {
+        if(!psList.isEmpty()) {
             discontinueParts(psList);
             psList.clear();
         }
@@ -692,61 +609,93 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
         return;
     }
 
-
-    @Override
-    public List<CatalogCustomer> getCatalogCustomers() {
-        return jdbcTemplate.query(getSelectNsCatalogCustomersSql(),new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class),new HashMap<>());
+    public List<CatalogCustomer> getKeyedCatalogCustomers(String accountId) {
+            MapSqlParameterSource msps = new MapSqlParameterSource();
+            msps.addValue("accountId",accountId);
+            String sql = getCatalogCustomersSql() + " AND price_list_access_key is not null";
+            return jdbcTemplate.query(sql,msps,new BeanPropertyRowMapper<>(CatalogCustomer.class));
     }
 
     @Override
-    public CatalogCustomer getCustomer(int customerId) {
+    public List<CatalogCustomer> getCatalogCustomers(String accountId) {
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("accountId",accountId);
+        return jdbcTemplate.query(getCatalogCustomersSql(),msps,new BeanPropertyRowMapper<>(CatalogCustomer.class));
+    }
+
+    @Override
+    public CatalogCustomer getCatalogCustomer(String accountId, int id) {
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("id",id);
+        msps.addValue("accountId",accountId);
+        String sql = getCatalogCustomersSql() + " AND id = :id";
+        return jdbcTemplate.queryForObject(sql,msps, new BeanPropertyRowMapper<>(CatalogCustomer.class));
+    }
+
+/*
+    @Override
+    public List<Part> getCacheCustomerParts(String accountId, int customerId) {
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("customerId",customerId);
-        return jdbcTemplate.queryForObject(getCatalogCustomerSql,new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class), msps);
-    }
+        msps.addValue("accountId",accountId);
 
+        return jdbcTemplate.query(getGetCacheCustomerPartsSql(),new BeanPropertyRowMapper<Part>(Part.class), msps);
+    }
+*/
     @Override
-    public List<Part> getCacheCustomerParts(int customerId) {
+    public List<Part> getCachePartsList(String accountId, Boolean discontinue)  {
         MapSqlParameterSource msps = new MapSqlParameterSource();
-        msps.addValue("customerId",customerId);
-        List<Part> parts = jdbcTemplate.query(getGetCacheCustomerPartsSql(),new BeanPropertyRowMapper<Part>(Part.class), msps);
-        return parts;
-    }
-
-    @Override
-    public List<Part> getCachePartsList(Boolean discontinue)  {
-        StringBuilder sql = new StringBuilder(getQueryCachePartsListSql()).append(" WHERE (1=1)");
+        msps.addValue("accountId",accountId);
+        StringBuilder sql = new StringBuilder(getQueryCachePartsListSql());
         if(discontinue != null) {
             sql.append(" AND discontinue = ").append(discontinue ? "true" : "false");
         }
         sql.append(" ORDER BY PART_NO");
-        return jdbcTemplate.query(sql.toString(),new BeanPropertyRowMapper<Part>(Part.class));
+        return jdbcTemplate.query(sql.toString(),msps,new BeanPropertyRowMapper<>(Part.class));
+    }
+    @Override
+    public int upsertCacheCustomers(String accountId) {
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("accountId",accountId);
+        return dynamicUpsert("CUSTOMERS",msps);
+        //return jdbcTemplate.update(getUpsertCacheItemsSql(),msps);
     }
 
     @Override
-    public int upsertCacheItems() {
-        return jdbcTemplate.update(getUpsertCacheItemsSql());
+    public int upsertCacheItems(String accountId) {
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("accountId",accountId);
+        return dynamicUpsert("ITEMS",msps);
+        //return jdbcTemplate.update(getUpsertCacheItemsSql(),msps);
     }
     @Override
-    public int discontinueCacheItems() {
-        return jdbcTemplate.update(getDiscontinueCacheItemsSql());
+    public int discontinueCacheItems(String accountId) {
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("accountId",accountId);
+        return jdbcTemplate.update(getDiscontinueCacheItemsSql(),msps);
     }
     @Override
-    public int upsertCustomerPrices(int customerId) {
+    public int upsertCustomerPrices(String accountId, int customerId) {
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("customerId",customerId);
-        return jdbcTemplate.update(getUpsertCustomerPricesSql(),msps);
+        msps.addValue("accountId",accountId);
+        return dynamicUpsert("CUSTOMER_ITEM_PRICES",msps);
+        //return jdbcTemplate.update(getUpsertCustomerPricesSql(),msps);
     }
     @Override
-    public int discontinueCustomerPrices() {
-        return jdbcTemplate.update(getDiscontinueCustomerPricesSql());
+    public int discontinueCustomerPrices(String accountId)   {
+        MapSqlParameterSource msps = new MapSqlParameterSource();
+        msps.addValue("accountId",accountId);
+        return jdbcTemplate.update(getDiscontinueCustomerPricesSql(),msps);
     }
 
     @Override
-    public void assignCacheCustomerPrices(Map<Integer, Part> basePartsMap, int customerId) {
+    public void assignCacheCustomerPrices(Map<Integer, Part> basePartsMap, String accountId, int customerId) {
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("customerId",customerId);
-        jdbcTemplate.getNamedParameterJdbcOperations().query(queryCacheCustomerItemPricesSql,msps,
+        msps.addValue("accountId",accountId);
+
+        jdbcTemplate.query(getQueryCacheCustomerItemPricesSql(),msps,
                 new RowCallbackHandler() {
                     @Override
                     public void processRow(ResultSet rs) throws SQLException {
@@ -763,19 +712,19 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     }
 
     @Override
-    public Part getCustomerPart(int customerId, int partId) {
+    public Part getCustomerPart(String accountId, int customerId, int partId) {
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("partId",partId);
-        Part part = jdbcTemplate.queryForObject(queryBasePartSql,new BeanPropertyRowMapper<Part>(Part.class),msps);
+        msps.addValue("accountId",accountId);
 
-        StringBuilder sql = new StringBuilder(queryCacheCustomerItemPricesSql);
-        sql.append(" AND id = :partId");
+        Part part = jdbcTemplate.queryForObject(getQueryBasePartSql(),msps,new BeanPropertyRowMapper<>(Part.class));
+
+        String sql = getQueryCacheCustomerItemPricesSql() + " AND id = :partId";
         msps.addValue("customerId",customerId);
-        jdbcTemplate.getNamedParameterJdbcOperations().query(queryCacheCustomerItemPricesSql,msps,
+        jdbcTemplate.query(sql,msps,
                 new RowCallbackHandler() {
                     @Override
                     public void processRow(ResultSet rs) throws SQLException {
-                        int id = rs.getInt("id");
                         BigDecimal price = rs.getBigDecimal("price");
                         Date lastModified = rs.getDate("last_modified");
                         part.setCustomerPrice(price);
@@ -790,16 +739,16 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     public Part getBasePart(int partId) {
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("partId",partId);
-        return jdbcTemplate.queryForObject(queryBasePartSql,new BeanPropertyRowMapper<Part>(Part.class),msps);
+        return jdbcTemplate.queryForObject(getQueryBasePartSql(),msps,new BeanPropertyRowMapper<Part>(Part.class));
     }
 
     @Override
-    public int getAccessCount(int customerId) {
+    public Integer getAccessCount(int customerId) {
         String getCatalogAccessCountSql =
                 "SELECT count(*) FROM REQUEST_LOG WHERE CUSTOMER_ID = :customerId AND CREATE_TS > (CURRENT_TIMESTAMP - interval '24 hour') and STATUS = 'ACCEPTED'";
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("customerId",customerId);
-        return jdbcTemplate.queryForInt(getCatalogAccessCountSql, msps);
+        return jdbcTemplate.queryForObject(getCatalogAccessCountSql, msps, Integer.class);
     }
     /*
     INSERT INTO REQUEST_LOG (
@@ -823,7 +772,7 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     public List<Map<String, Object>> requestLogReport(Integer customerId, Date asOfDate) {
 
         MapSqlParameterSource msps = new MapSqlParameterSource();
-        StringBuffer rlrSql = new StringBuffer(requestLogReportSql);
+        StringBuilder rlrSql = new StringBuilder(getRequestLogReportSql());
         if(customerId != null) {
             rlrSql.append(" AND (c.customer_id = :customerId)");
             msps.addValue("customerId",customerId);
@@ -839,4 +788,149 @@ public class CatalogDaoImpl implements com.suitesoftware.psa.catalogservice.Cata
     }
 
 
+    public int dynamicUpsert(String duName, Map<String,Object> params) {
+        return dynamicUpsert(duName,new MapSqlParameterSource(params));
+    }
+
+    private String sqlEscape(String colName) {
+        return "\"" + colName + "\"";
+    }
+
+    public int dynamicUpsert(String duName, MapSqlParameterSource msps) {
+
+        class DynamicUpsertDef {
+            DynamicUpsertDef(String name, String fromTable, String toTable, String excludeKey)  {
+                this.name = name;
+                this.fromTable = fromTable;
+                this.toTable = toTable;
+                this.excludeKey = excludeKey;
+                //this.requiredParams = null;// = Arrays.asList(requiredParams);
+            }
+            //public List<String> requiredParams;
+            public String name;
+            public String fromTable;
+            public String toTable;
+            public String excludeKey;
+        }
+
+        Map<String,DynamicUpsertDef> dynamicUpsertDefs = new HashMap<>();
+        dynamicUpsertDefs.put("ITEMS",
+                new DynamicUpsertDef(
+                        "ITEMS",
+                        "xfer_items",
+                        "cache_items",
+                        "id"
+                        //,new String[] {"accountId"}
+                ));
+        dynamicUpsertDefs.put("CUSTOMER_ITEM_PRICES",
+                new DynamicUpsertDef(
+                        "CUSTOMER_ITEM_PRICES",
+                        "xfer_customer_item_prices",
+                        "cache_customer_item_prices",
+                        "id"
+                        //,new String[] {"accountId","customerId"}
+                ));
+        dynamicUpsertDefs.put("CUSTOMERS",
+                new DynamicUpsertDef(
+                        "CUSTOMERS",
+                        "xfer_customers",
+                        "cache_customers",
+                        "id"
+                        //,new String[]{"accountId"}
+                ));
+        DynamicUpsertDef duDef = dynamicUpsertDefs.get(duName);
+
+        if(duDef == null) {
+            throw new IllegalArgumentException("DynamicUpsertDef not found for " + duName);
+        }
+//        duDef.requiredParams.forEach(param -> {
+//            if(!msps.hasValue(param)) {
+//                throw new IllegalArgumentException("Missing required parameter: " + param);
+//            }
+//        });
+        List<String> columns = new LinkedList<>();
+        List<String> primaryKeys = new LinkedList<>();
+        List<String> excludeColumns  = new LinkedList<String>() {{
+            add(sqlEscape("last_modified"));
+            add(sqlEscape("discontinue"));
+        }};
+        // get metadata
+        try(Connection conn = dataSource.getConnection()) {
+            ResultSet rs = conn.getMetaData().getColumns(null,null,duDef.toTable,null);
+            while(rs.next()) {
+                columns.add(sqlEscape(rs.getString("COLUMN_NAME")));
+            }
+            rs.close();
+            rs = conn.getMetaData().getPrimaryKeys(null,null,duDef.toTable);
+            while(rs.next()) {
+                primaryKeys.add(sqlEscape(rs.getString("COLUMN_NAME")));
+            }
+            rs.close();
+        } catch (SQLException ex) {
+            log.error("dynamicUpsert MetaData error: " + ex.getMessage(),ex);
+        }
+
+        Map<String,String> valuesMap = new HashMap<>();
+        valuesMap.put("fromTable",duDef.fromTable);
+        valuesMap.put("toTable",duDef.toTable);
+        valuesMap.put("primaryKeys",String.join(", ", primaryKeys));
+
+        valuesMap.put("columns", String.join(", ", columns));
+
+        String compareColumns = columns.stream().filter(column -> !excludeColumns.contains(column)).collect(Collectors.joining(", "));
+
+        valuesMap.put("compareFromColumns",compareColumns + (columns.contains(sqlEscape("discontinue")) ? ", false as discontinue" : ""));
+        valuesMap.put("compareToColumns",compareColumns + (columns.contains(sqlEscape("discontinue")) ? ", discontinue" : ""));
+
+        valuesMap.put("compareWhere", primaryKeys.stream().map(column -> {
+            if(sqlEscape(duDef.excludeKey).equalsIgnoreCase(column))
+                return "(1=1)";
+            if(sqlEscape("account_id").equalsIgnoreCase(column) )
+                return column + "  = :accountId";
+            if(sqlEscape("customer_id").equalsIgnoreCase(column) )
+                return column + " = :customerId";
+            throw new IllegalArgumentException("Primary key column not supported: " + column);
+        }).collect(Collectors.joining(" AND ")));
+
+        valuesMap.put("changedColumns",columns.stream().map(column -> sqlEscape("last_modified").equalsIgnoreCase(column) ? "NOW()" : "CHANGED." + column).collect(Collectors.joining(", ")));
+
+        valuesMap.put("excludedKeys", String.join(", ", primaryKeys));
+
+        valuesMap.put("excludedColumns",columns.stream().filter(column -> !primaryKeys.contains(column)).map(column ->
+                column + " = " + (sqlEscape("last_modified").equalsIgnoreCase(column) ? "NOW()" : "EXCLUDED." + column)
+        ).collect(Collectors.joining(", ")));
+
+
+        String upsertTemplate =
+            "WITH CHANGED AS (" +
+            "SELECT ${compareFromColumns} FROM ${fromTable} WHERE ${compareWhere} " +
+            " EXCEPT " +
+            "SELECT ${compareToColumns} FROM ${toTable} WHERE ${compareWhere} ) " +
+            " INSERT INTO ${toTable} ( ${columns} ) " +
+            " SELECT ${changedColumns} " +
+            " FROM CHANGED " +
+            " ON CONFLICT (${primaryKeys}) DO UPDATE SET " +
+            " ${excludedColumns}";
+
+        StringSubstitutor stringSubstitutor = new StringSubstitutor(valuesMap);
+        String sql = stringSubstitutor.replace(upsertTemplate);
+        log.info("dynamicUpsert: " + sql);
+        return jdbcTemplate.update(sql,msps);
+
+//        StringBuilder sql = new StringBuilder("UPDATE ").append(tableName).append(" SET ");
+//        StringBuilder whereSql = new StringBuilder(" WHERE ");
+//        MapSqlParameterSource msps = new MapSqlParameterSource();
+//        for(String key : values.keySet()) {
+//            sql.append(key).append(" = :").append(key).append(",");
+//            msps.addValue(key,values.get(key));
+//        }
+//        sql.deleteCharAt(sql.length()-1);
+//        for(String key : where.keySet()) {
+//            whereSql.append(key).append(" = :").append(key).append(" AND ");
+//            msps.addValue(key,where.get(key));
+//        }
+//        whereSql.delete(whereSql.length()-5,whereSql.length());
+//        sql.append(whereSql);
+//        return jdbcTemplate.update(sql.toString(),msps);
+    }
 }

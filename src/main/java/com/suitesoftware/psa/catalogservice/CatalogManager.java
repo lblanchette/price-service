@@ -4,7 +4,7 @@ import com.suitesoftware.psa.catalogservice.dto.CatalogCustomer;
 import com.suitesoftware.psa.catalogservice.dto.Part;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.ws.rs.core.StreamingOutput;
+import jakarta.ws.rs.core.StreamingOutput;
 import java.util.Date;
 
 public interface CatalogManager {
@@ -12,16 +12,16 @@ public interface CatalogManager {
 
     StreamingOutput getUncachedCatalogOutputStream(CatalogCustomer customer, Date modifiedSince, String format);
 
-    CatalogCustomer getCustomer(Integer custoemrId);
+    CatalogCustomer getCatalogCustomer(String accountId, Integer custoemrId);
 
-    Part getCustomerPart(Integer custoemrId, Integer partId);
+    Part getCustomerPart(String accountId, Integer customerId, Integer partId);
 
     void insertRequestLog(int customerId, String status, String response, int bytes) throws CatalogException;
 
     void refreshCustomerPrices(Integer customerId) throws Exception;
-/*
+
     void refreshCustomers() throws Exception;
-*/
+
     String getAccessReport(Integer customerId, Date asOfDate);
 
     void compareCustomerPrices();

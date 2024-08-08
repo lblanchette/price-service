@@ -38,30 +38,33 @@ public interface CatalogDao {
 
     void updateCustomerCacheParts(int customerId, Map<Integer, Part> basePartsMap, Map<Integer, BigDecimal> customerPriceMap);
 
-    List<CatalogCustomer> getCatalogCustomers();
+    //List<CatalogCustomer> getCatalogCustomers();
 
+    List<CatalogCustomer> getKeyedCatalogCustomers(String accountId);
+    List<CatalogCustomer> getCatalogCustomers(String accountId);
+    CatalogCustomer getCatalogCustomer(String accountId, int customerId);
 
-    CatalogCustomer getCustomer(int customerId);
+    //List<Part> getCacheCustomerParts(String accountId, int customerId);
 
-    List<Part> getCacheCustomerParts(int customerId);
+    List<Part> getCachePartsList(String accountId, Boolean discontinue);
 
-    List<Part> getCachePartsList(Boolean discontinue);
+    int upsertCacheCustomers(String accountId);
 
-    int upsertCacheItems();
+    int upsertCacheItems(String accountId);
 
-    int discontinueCacheItems();
+    int discontinueCacheItems(String accountId);
 
-    int upsertCustomerPrices(int customerId);
+    int upsertCustomerPrices(String accountId, int customerId);
 
-    int discontinueCustomerPrices();
+    int discontinueCustomerPrices(String accountId);
 
-    void assignCacheCustomerPrices(Map<Integer, Part> basePartsMap, int customerId);
+    void assignCacheCustomerPrices(Map<Integer, Part> basePartsMap, String accountId, int customerId);
 
-    Part getCustomerPart(int customerId, int partId);
+    Part getCustomerPart(String accountId, int customerId, int partId);
 
     Part getBasePart(int partId);
 
-    int getAccessCount(int customerId);
+    Integer getAccessCount(int customerId);
 
     int insertRequestLog(int customerId, String status, String response, int bytes);
 

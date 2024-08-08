@@ -3,9 +3,12 @@ package com.suitesoftware.dbcopy;
 import com.suitesoftware.dbcopy.bulk.BulkProcessor;
 import com.suitesoftware.dbcopy.bulk.BulkWriteHandler;
 import com.suitesoftware.dbcopy.bulk.PgTextInsert;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterUtils;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -13,12 +16,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Map;
+
 /**
  * This utility is used large batch type transfers between DBs.  It does a "copy" using SQL to read and
  * BulkProcessor to write. The configuration class CopyDef defines source and target.  Source can be a
  * table or select statement.  Target can be a table or temporary table.  ColCopyDef specified columns
  * and data types on both sides. DdlDef is used what a temp table is required.
- *
  * User: lrb
  * Date: Oct 2, 2010
  * Time: 1:08:38 AM
@@ -26,14 +30,14 @@ import java.sql.SQLException;
  */
 public class CopyProcessor4 {
 
-    private class Stats {
+    private static class Stats {
         long startTime = System.currentTimeMillis();
         long queryTime = 0;
         long rowsProcessed = 0;
         long intervalRowsProcessed = 0;
     }
 
-    private final Logger log = Logger.getLogger(getClass());
+    private static final Logger log = LogManager.getLogger(CopyProcessor4.class);
     DataSource srcDataSource;
     DataSource dstDataSource;
 
@@ -76,10 +80,10 @@ public class CopyProcessor4 {
         }
         StringBuilder from = new StringBuilder(" FROM ");
         from.append(copyDef.getSrcTable()).append(" ");
-        if(copyDef.getWhereClause() != null && copyDef.getWhereClause().length() > 0) {
+        if(copyDef.getWhereClause() != null && !copyDef.getWhereClause().isEmpty()) {
             from.append(" WHERE ").append(copyDef.getWhereClause());
         }
-        if(sortKeyName != null && sortKeyName.length() > 0) {
+        if(sortKeyName != null && !sortKeyName.isEmpty()) {
             from.append(" ORDER BY ").append(sortKeyName).append(" ASC");
         }
         return select.append(from).toString();
@@ -105,11 +109,11 @@ public class CopyProcessor4 {
         }
     }
 
-    private void initDstTable(CopyDef copyDef, MapSqlParameterSource msps) throws SQLException {
+    private void initDstTable(CopyDef copyDef, Map<String,Object> msps) throws SQLException {
         if(copyDef.isUseTemp()) {
             createTemp(copyDef.getDstTable(), copyDef.getDdlDef().getCreateDdl());
         }
-        if(copyDef.getPrepSql() != null && copyDef.getPrepSql().trim().length() > 0) {
+        if(copyDef.getPrepSql() != null && !copyDef.getPrepSql().trim().isEmpty()) {
             try (Connection conn = dstDataSource.getConnection()) {
 
                 makeNamedParameterStatement(conn, copyDef.getPrepSql(), msps).execute();
@@ -154,15 +158,10 @@ public class CopyProcessor4 {
         log.info("SWAP complete");
     }
 
-    private void postProcessTable(CopyDef copyDef, MapSqlParameterSource msps)  throws SQLException {
-        if(copyDef.isUseTemp()) {
-            swapTemp(copyDef);
-        }
-    }
-
-    private PreparedStatement makeNamedParameterStatement(Connection conn, String sql, MapSqlParameterSource msps) throws SQLException {
-        Object[] values = NamedParameterUtils.buildValueArray(sql, msps.getValues());
-        String pSql = NamedParameterUtils.substituteNamedParameters(sql, msps);
+    private PreparedStatement makeNamedParameterStatement(Connection conn, String sql, Map<String,Object> msps) throws SQLException {
+        Object[] values = NamedParameterUtils.buildValueArray(sql, msps);
+        SqlParameterSource sqlParameterSources = new MapSqlParameterSource(msps);
+        String pSql = NamedParameterUtils.substituteNamedParameters(sql, sqlParameterSources);
         PreparedStatement ps = conn.prepareStatement(pSql);
         for (int i = 0; i < values.length; i++) {
             ps.setObject(i + 1, values[i]);
@@ -170,28 +169,33 @@ public class CopyProcessor4 {
         return ps;
     }
 
-    void serialBulkLoadTable(final CopyDef copyDef, MapSqlParameterSource msps) {
+    void serialBulkLoadTable(final CopyDef copyDef, Map<String,Object> params) {
 
+        boolean completedNoError = false;
         try {
             log.info("Start bulkLoadTable(): " + copyDef.getSrcTable());
 
             String select = buildSelect(copyDef);
 
-            initDstTable(copyDef, msps);
-
-            boolean completedNoError = false;
+            initDstTable(copyDef, params);
 
             String loadTableName = copyDef.isUseTemp() ? tempTableName(copyDef.getDstTable()) : copyDef.getDstTable();
 
             final Stats stats = new Stats();
 
-            try( BulkProcessor bulkProcessor = new BulkProcessor(new BulkWriteHandler(new PgTextInsert("public",loadTableName,copyDef.getDstColumnNames()), getDstDataSource()), PAGE_SIZE)) {
+            String[] columnNames = new String[copyDef.getDstColumnNames().length + (copyDef.addAccountId?1:0)];
+            System.arraycopy(copyDef.getDstColumnNames(), 0, columnNames, 0, copyDef.getDstColumnNames().length);
+            if(copyDef.addAccountId) {
+                columnNames[columnNames.length - 1] = "account_id";
+            }
+
+            try( BulkProcessor bulkProcessor = new BulkProcessor(new BulkWriteHandler(new PgTextInsert("public",loadTableName,columnNames), getDstDataSource()), PAGE_SIZE)) {
 
                 try(Connection conn = getSrcDataSource().getConnection()) {
 
                     stats.startTime = System.currentTimeMillis();
 
-                    ResultSet resultSet = makeNamedParameterStatement(conn, select, msps).executeQuery();
+                    ResultSet resultSet = makeNamedParameterStatement(conn, select, params).executeQuery();
 
                     while (resultSet.next()) {
 
@@ -200,7 +204,7 @@ public class CopyProcessor4 {
                             log.info("Fetch Stats  " + copyDef.getSrcTable() + ", query time: " + (stats.queryTime / 1000)+ "s");
                         }
 
-                        String[] row = new String[copyDef.columns.length];
+                        String[] row = new String[copyDef.columns.length + (copyDef.addAccountId ? 1 : 0)];
 
                         for (int i = 0; i < copyDef.columns.length; i++) {
                             ColCopyDef colCopyDef = copyDef.columns[i];
@@ -238,6 +242,9 @@ public class CopyProcessor4 {
                                     log.warn("ERROR: unknown column type for " + colCopyDef.getName());
                             }
                         }
+                        if(copyDef.addAccountId) {
+                            row[row.length - 1] = params.get("accountId").toString();
+                        }
                         bulkProcessor.add(row);
                         stats.rowsProcessed++;
                         stats.intervalRowsProcessed++;
@@ -249,6 +256,9 @@ public class CopyProcessor4 {
                                     ", overall r/s: " + ((stats.rowsProcessed * 1000) / elapsed));
                         }
                     }
+                    if(!conn.getAutoCommit()) {
+                        conn.commit();
+                    }
                 }
                 long elapsed = System.currentTimeMillis() - stats.startTime;
                 log.info("READ FINISHED " + copyDef.getSrcTable() + "," + stats.rowsProcessed + ", r/s: " + ((stats.rowsProcessed * 1000) / elapsed));
@@ -257,25 +267,24 @@ public class CopyProcessor4 {
                 log.error(ex.getMessage(), ex);
             }
             if(completedNoError) {
-                postProcessTable(copyDef, msps);
+                if(copyDef.isUseTemp()) {
+                    swapTemp(copyDef);
+                }
             }
         } catch (Throwable ex) {
             log.warn(ex.getMessage(), ex);
         }
     }
 
-    public void copyTable(CopyDef copyDef, MapSqlParameterSource msps) {
+    public void copyTable(CopyDef copyDef, Map<String,Object> params) {
         log.info("Copy table: " + copyDef.getSrcTable());
+
+        //MapSqlParameterSource msps = new MapSqlParameterSource();
+        //params.forEach(msps::addValue);
         try {
-            serialBulkLoadTable(copyDef, msps);
+            serialBulkLoadTable(copyDef, params);
         } catch (Throwable ex) {
             log.error(copyDef.getSrcTable() + ": " + ex.getMessage(),ex);
         }
     }
-
-//    public void copyTables() {
-//        for(CopyDef copyDef : copyDefs) {
-//            copyTable(copyDef);
-//        }
-//    }
 }

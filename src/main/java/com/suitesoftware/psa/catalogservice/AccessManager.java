@@ -1,7 +1,6 @@
 package com.suitesoftware.psa.catalogservice;
 
 import com.suitesoftware.psa.catalogservice.dto.CatalogCustomer;
-import org.springframework.transaction.annotation.Transactional;
 
 public interface AccessManager {
 

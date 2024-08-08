@@ -5,19 +5,20 @@ import com.suitesoftware.psa.catalogservice.dto.Catalog;
 import com.suitesoftware.psa.catalogservice.dto.CatalogCustomer;
 import com.suitesoftware.psa.catalogservice.dto.Part;
 import com.suitesoftware.psa.catalogservice.dto.PartList;
-import org.apache.log4j.Logger;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.ObjectWriter;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+//import org.codehaus.jackson.map.ObjectMapper;
+//import org.codehaus.jackson.map.ObjectWriter;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationContext;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.StreamingOutput;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.Marshaller;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.StreamingOutput;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.Marshaller;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
@@ -32,7 +33,7 @@ import java.util.*;
 //@Transactional
 public class CatalogManagerImpl implements CatalogManager {
 
-    private Logger log = Logger.getLogger(getClass());
+    private static final Logger log = LogManager.getLogger(CatalogManager.class);
 
     @Autowired
     ApplicationContext applicationContext;
@@ -76,13 +77,14 @@ public class CatalogManagerImpl implements CatalogManager {
     public void setCacheFileManager(CacheFileManagerImpl cacheFileManager) {
         this.cacheFileManager = cacheFileManager;
     }
+
     public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
         this.applicationContext = applicationContext;
     }
 
 
-    public CatalogCustomer getCustomer(Integer customerId) {
-        return getCatalogDao().getCustomer(customerId);
+    public CatalogCustomer getCatalogCustomer(String accountId, Integer customerId) {
+        return getCatalogDao().getCatalogCustomer(accountId, customerId);
     }
 
     @Override
@@ -100,12 +102,12 @@ public class CatalogManagerImpl implements CatalogManager {
     public StreamingOutput getUncachedCatalogOutputStream(CatalogCustomer customer, Date modifiedSince, String format) {
         StringBuilder errorBuilder = new StringBuilder();
         try {
-            List<Part> parts = getCatalogDao().getCachePartsList(false);
+            List<Part> parts = getCatalogDao().getCachePartsList(customer.getAccountId(),false);
             Map<Integer,Part> basePartsMap = new HashMap<Integer, Part>(parts.size());
             for(Part part : parts) {
                 basePartsMap.put(part.getId(),part);
             }
-            getCatalogDao().assignCacheCustomerPrices(basePartsMap, customer.getCustomerId());
+            getCatalogDao().assignCacheCustomerPrices(basePartsMap, customer.getAccountId(), customer.getCustomerId());
 
             Catalog catalog = new Catalog();
             catalog.setCustomerId(customer.getCustomerId());
@@ -228,8 +230,8 @@ public class CatalogManagerImpl implements CatalogManager {
 */
     @Override
     @Transactional(readOnly = true)
-    public Part getCustomerPart(Integer custoemrId, Integer partId) {
-        return getCatalogDao().getCustomerPart(custoemrId, partId);
+    public Part getCustomerPart(String accountId, Integer customerId, Integer partId) {
+        return getCatalogDao().getCustomerPart(accountId, customerId, partId);
     }
 
     /*
@@ -277,26 +279,25 @@ public class CatalogManagerImpl implements CatalogManager {
     @Override
     public void refreshCustomerPrices(Integer customerId)  {
         try {
-            log.info("Start refresh");
+            log.info("refreshCustomerPrices() Start refresh");
             RefreshNsCustomerPriceCacheJob job = applicationContext.getBean(RefreshNsCustomerPriceCacheJob.class);
             job.startRefresh(customerId);
+//            job.startRefresh(949);
         } catch(Throwable ex) {
             log.warn(ex.getMessage(),ex);
         }
     }
-/*
+
     @Override
     public void refreshCustomers()  {
         try {
-            log.info("Start refresh");
-
+            log.info("refreshCustomers() Start refresh");
             RefreshNsCustomerPriceCacheJob job = applicationContext.getBean(RefreshNsCustomerPriceCacheJob.class);
             job.startRefresh();
         } catch(Throwable ex) {
             log.warn(ex.getMessage(),ex);
         }
     }
-*/
 
 
     public void compareCustomerPrices()  {
@@ -350,10 +351,11 @@ public class CatalogManagerImpl implements CatalogManager {
                     if (oldPart == null) {
                         System.out.println(newPart.getId() + ",old part not found");
                     } else if (oldPart.changed(newPart)) {
-                        ObjectWriter ow = new ObjectMapper().writer().withDefaultPrettyPrinter();
-                        System.out.println("OLD:\n" + ow.writeValueAsString(oldPart));
-                        System.out.println("NEW:\n" + ow.writeValueAsString(newPart));
-                        //System.out.println(oldPart.getId() + "," + oldPart.getPrice().toPlainString() + "," + newPart.getPrice().toPlainString());
+
+//                        ObjectWriter ow = new ObjectMapper().writer().withDefaultPrettyPrinter();
+//                        System.out.println("OLD:\n" + ow.writeValueAsString(oldPart));
+//                        System.out.println("NEW:\n" + ow.writeValueAsString(newPart));
+                        System.out.println(oldPart.getId() + "," + oldPart.getPrice().toPlainString() + "," + newPart.getPrice().toPlainString());
                     }
                 }
             }

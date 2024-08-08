@@ -6,9 +6,8 @@ package com.suitesoftware.psa.catalogservice.dto;
  * Time: 6:02 AM
  * (c) Copyright Suite Business Software
  */
-public class CatalogCustomer {
+public class NsCustomer {
 
-    Integer id;
     String accountId;
     Integer customerId;
     Integer parentId;
@@ -19,14 +18,6 @@ public class CatalogCustomer {
     String oldId;
     String priceListAccessKey;
 
-    public Integer getId() {
-        return id == null ? customerId : id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
     public String getAccountId() {
         return accountId;
     }
@@ -36,7 +27,7 @@ public class CatalogCustomer {
     }
 
     public Integer getCustomerId() {
-        return customerId != null ? customerId : id;
+        return customerId;
     }
 
     public void setCustomerId(Integer customerId) {

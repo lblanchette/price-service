@@ -1,12 +1,14 @@
-logs
-conf
-prod
+.smarttomcat
 base-src
+logs
+prod
 psa_cache
-price-service.iml
+target
 work
+price-service.iml
 price-service.ipr
 price-service.iws
-target
+.idea
 **/.DS_Store
+
 

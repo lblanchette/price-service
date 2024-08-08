@@ -2,7 +2,7 @@ package com.suitesoftware.psa.catalogservice;
 
 import com.suitesoftware.psa.catalogservice.dto.Catalog;
 
-import javax.xml.bind.JAXB;
+import jakarta.xml.bind.JAXB;
 import java.io.File;
 
 public class TestXML {

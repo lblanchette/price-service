@@ -1,10 +1,10 @@
 package com.suitesoftware.psa.catalogservice;
 
-import javax.ws.rs.*;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
-import javax.xml.bind.JAXB;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.StreamingOutput;
+import jakarta.xml.bind.JAXB;
 import java.io.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -12,7 +12,9 @@ import java.util.*;
 import com.suitesoftware.psa.catalogservice.dto.Catalog;
 import com.suitesoftware.psa.catalogservice.dto.CatalogCustomer;
 import com.suitesoftware.psa.catalogservice.dto.Part;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
@@ -30,11 +32,12 @@ import org.springframework.stereotype.Component;
 @Scope("request")
 
 public class CatalogService {
+    private static final Logger log = LogManager.getLogger(CatalogService.class);
 
-    private final Logger log = Logger.getLogger(getClass());
+    String accountId = "1063595";
+
 
     private CatalogManager catalogManager;
-    private NsCatalogManager nsCatalogManager;
     private AccessManager accessManager;
 
     public CatalogManager getCatalogManager() {
@@ -44,15 +47,6 @@ public class CatalogService {
     @Autowired
     public void setCatalogManager(CatalogManager catalogManager) {
         this.catalogManager = catalogManager;
-    }
-
-
-    public NsCatalogManager getNsCatalogManager() {
-        return nsCatalogManager;
-    }
-
-    public void setNsCatalogManager(NsCatalogManager nsCatalogManager) {
-        this.nsCatalogManager = nsCatalogManager;
     }
 
     public AccessManager getAccessManager() {
@@ -91,7 +85,7 @@ public class CatalogService {
                 log.warn("Access key is required CustomerId: " + customerId);
                 throw new Exception("Access key is required");
             }
-            CatalogCustomer catalogCustomer = getCatalogManager().getCustomer(customerId);
+            CatalogCustomer catalogCustomer = getCatalogManager().getCatalogCustomer(accountId,customerId);
             getAccessManager().grantCatalogAccess(catalogCustomer, accessKey != null ? accessKey : headerAccessKey);
             getCatalogManager().insertRequestLog(customerId,"ACCEPTED","",0);
             Date modifiedSince = dateStringToDate(modifiedSinceStr);
@@ -110,10 +104,10 @@ public class CatalogService {
                 log.warn("Insert request log error: " + ex.getMessage());
             }
             log.info("AccessException getCatalog: " + ex.getMessage());
-            errorBuilder.append("Error: " + ex.getMessage());
+            errorBuilder.append("Error: ").append(ex.getMessage());
         } catch (Throwable ex) {
             log.warn("Error getCatalog", ex);
-            errorBuilder.append("Error: " + ex.getMessage());
+            errorBuilder.append("Error: ").append(ex.getMessage());
         }
         // otherwise return XML with error message
         Catalog catalog = new Catalog();
@@ -130,66 +124,7 @@ public class CatalogService {
             }
         }).build();
     }
-/*
-    @GET
-    @Path("{customerId : \\d+}")
-    @Produces("application/xml")
 
-    public Catalog getCatalog(@PathParam("customerId") int customerId, @QueryParam("modified-since") String modifiedSinceStr, @QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
-        try {
-            log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey +" CustomerId:" + customerId);
-            if(accessKey == null && headerAccessKey == null) {
-                log.warn("Access key is required CustomerId: " + customerId);
-                Catalog catalog = new Catalog();
-                catalog.setMessage("Access key is required");
-                return catalog;
-                //throw new Exception("Access key is required");
-            }
-            try {
-                getAccessManager().grantCatalogAccess(customerId, accessKey != null ? accessKey : headerAccessKey);
-            } catch (Exception ex) {
-                Catalog catalog = new Catalog();
-                catalog.setMessage(ex.getMessage());
-                return catalog;
-            }
-            getCatalogManager().insertRequestLog(customerId,"ACCEPTED","",0);
-            Date modifiedSince = null;
-            if(modifiedSinceStr != null && modifiedSinceStr.length() > 0) {
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                modifiedSince = sdf.parse(modifiedSinceStr);
-            }
-            return   getCatalogManager().cachedCatalogProducer(customerId, modifiedSince);
-        } catch (Throwable ex) {
-            log.error("Error processing request: " + ex.getMessage(),ex);
-            throw new Exception("Error processing request: " + ex.getMessage(),ex);
-        }
-    }
-
-*/
-    /**
-     * this is to be replaced with betaRefreshCustomerPrices
-     */
-/*
-    @GET
-    @Path("admin/refresh/customerPrices")
-    @Produces("text/plain")
-    public String refreshCustomerPrices(@QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
-        try {
-            log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey );
-            if(accessKey == null && headerAccessKey == null) {
-                throw new Exception("Access key is required");
-            }
-            if(!getAccessManager().grantAdminAccess(accessKey != null ? accessKey : headerAccessKey)) {
-                throw new Exception("Access denied.  The access key provided is not authorized to access the requested resource");
-            }
-            getCatalogManager().refreshCustomerPriceCache();
-            return "OK";
-        } catch (Throwable ex) {
-            log.error("Error processing request: " + ex.getMessage(),ex);
-            throw new Exception("Error processing request: " + ex.getMessage(),ex);
-        }
-    }
-*/
     @GET
     @Path("admin/refresh/customerPrices")
     @Produces("text/plain")
@@ -210,31 +145,10 @@ public class CatalogService {
         }
     }
 
-/*
     @GET
     @Path("admin/refresh/customerPrice/{customerId : \\d+}")
     @Produces("text/plain")
     public String refreshCustomerPrice(@PathParam("customerId") int customerId, @QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
-        try {
-            log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey );
-            if(accessKey == null && headerAccessKey == null) {
-                throw new Exception("Access key is required");
-            }
-            if(!getAccessManager().grantAdminAccess(accessKey != null ? accessKey : headerAccessKey)) {
-                throw new Exception("Access denied.  The access key provided is not authorized to access the requested resource");
-            }
-            getCatalogManager().refreshCustomerPriceCache();
-            return "OK";
-        } catch (Throwable ex) {
-            log.error("Error processing request: " + ex.getMessage(),ex);
-            throw new Exception("Error processing request: " + ex.getMessage(),ex);
-        }
-    }
-*/
-    @GET
-    @Path("admin/refresh/customerPrice/{customerId : \\d+}")
-    @Produces("text/plain")
-    public String betaRefreshCustomerPrice(@PathParam("customerId") int customerId, @QueryParam("access-key") String accessKey, @HeaderParam("x-psa-access-key") String headerAccessKey) throws Exception {
         try {
             log.info("getCatalog AccessKey:" + accessKey + "HeaderAccessKey:" + headerAccessKey );
             if(accessKey == null && headerAccessKey == null) {
@@ -250,7 +164,7 @@ public class CatalogService {
             throw new Exception("Error processing request: " + ex.getMessage(),ex);
         }
     }
-/*
+
     @GET
     @Path("admin/refresh/customers")
     @Produces("text/plain")
@@ -270,7 +184,6 @@ public class CatalogService {
             throw new Exception("Error processing request: " + ex.getMessage(),ex);
         }
     }
-*/
 
     @GET
     @Path("{customerId : \\d+}/part/{partId : \\d+}")
@@ -285,7 +198,8 @@ public class CatalogService {
         if(!getAccessManager().grantAdminAccess(accessKey != null ? accessKey : headerAccessKey)) {
             throw new Exception("Access denied.  The access key provided is not authorized to access the requested resource");
         }
-        return getCatalogManager().getCustomerPart(customerId, partId);
+        String accountId = "1063595";
+        return getCatalogManager().getCustomerPart(accountId, customerId, partId);
     }
 
     @GET

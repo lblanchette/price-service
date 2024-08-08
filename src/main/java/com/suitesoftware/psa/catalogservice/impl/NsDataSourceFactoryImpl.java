@@ -1,8 +1,11 @@
 package com.suitesoftware.psa.catalogservice.impl;
 
+
 import com.suitesoftware.psa.catalogservice.NsDataSourceFactory;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.log4j.Logger;
+import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.LogManager;
+
 import org.springframework.jdbc.datasource.SimpleDriverDataSource;
 
 import javax.sql.DataSource;
@@ -16,7 +19,7 @@ import java.util.Map;
 
 public class NsDataSourceFactoryImpl implements NsDataSourceFactory {
 
-    private final Logger log = Logger.getLogger(getClass());
+    private static final Logger log = LogManager.getLogger(NsDataSourceFactoryImpl.class);
 
     private final String connectionStringFormat = "jdbc:ns://%s.%s:%d;ServerDataSource=%s;encrypted=1;CustomProperties=(AccountID=%s;RoleID=%d)";
     private Driver nsDriver; //com.netsuite.jdbc.openaccess.OpenAccessDriver

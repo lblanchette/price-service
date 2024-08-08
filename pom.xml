@@ -24,53 +24,152 @@
             <!--</plugin>-->
         </plugins>
     </build>
+
     <dependencies>
+        <!-- Jersey Core -->
         <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-            <version>1.2.17</version>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-server</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.core</groupId>
+            <artifactId>jersey-common</artifactId>
+            <version>3.1.8</version>
         </dependency>
 
+        <!-- Jersey Servlet Integration -->
+        <dependency>
+            <groupId>org.glassfish.jersey.containers</groupId>
+            <artifactId>jersey-container-servlet</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jersey.containers</groupId>
+            <artifactId>jersey-container-servlet-core</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+
+        <!-- JSON Processing -->
+        <dependency>
+            <groupId>org.glassfish.jersey.media</groupId>
+            <artifactId>jersey-media-json-binding</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+
+        <!-- Optional: Logging -->
+        <dependency>
+            <groupId>org.glassfish.jersey.ext</groupId>
+            <artifactId>jersey-bean-validation</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>log4j</groupId>-->
+<!--            <artifactId>log4j</artifactId>-->
+<!--            <version>1.2.17</version>-->
+<!--        </dependency>-->
+
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.23.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.23.1</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>1.12.0</version>
+        </dependency>
+
+<!--        <dependency>-->
+<!--            <groupId>org.glassfish.jersey.core</groupId>-->
+<!--            <artifactId>jersey-server</artifactId>-->
+<!--            <version>3.1.8</version>-->
+<!--        </dependency>-->
+<!--
         <dependency>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-server</artifactId>
             <version>${jersey-version}</version>
         </dependency>
+-->
+<!--        <dependency>-->
+<!--            <groupId>org.glassfish.jersey.core</groupId>-->
+<!--            <artifactId>jersey-common</artifactId>-->
+<!--            <version>3.1.8</version>-->
+<!--        </dependency>-->
+<!--
         <dependency>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-core</artifactId>
             <version>${jersey-version}</version>
         </dependency>
+-->
+<!--        <dependency>-->
+<!--            <groupId>org.glassfish.jersey.media</groupId>-->
+<!--            <artifactId>jersey-media-json-jackson</artifactId>-->
+<!--            <version>3.1.8</version>-->
+<!--        </dependency>-->
+<!--
         <dependency>
             <groupId>com.sun.jersey</groupId>
             <artifactId>jersey-json</artifactId>
             <version>${jersey-version}</version>
         </dependency>
+-->
+<!--        <dependency>-->
+<!--            <groupId>org.glassfish.jersey.containers</groupId>-->
+<!--            <artifactId>jersey-container-servlet</artifactId>-->
+<!--            <version>3.1.8</version>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>org.glassfish.jersey.inject</groupId>-->
+<!--            <artifactId>jersey-hk2</artifactId>-->
+<!--            <version>3.1.8</version>-->
+<!--        </dependency>-->
 
         <dependency>
-            <groupId>NQjc</groupId>
-            <artifactId>NQjc</artifactId>
-<!--            <version>8.10.85.0</version>-->
-            <version>8.10.136.0</version>
+            <groupId>org.glassfish.jersey.ext</groupId>
+            <artifactId>jersey-spring6</artifactId>
+            <version>3.1.8</version>
+        </dependency>
+
+<!--        <dependency>-->
+<!--            <groupId>javax.ws.rs</groupId>-->
+<!--            <artifactId>javax.ws.rs-api</artifactId>-->
+<!--            <version>2.0.1</version>-->
+<!--        </dependency>-->
+<!--        <dependency>-->
+<!--            <groupId>javax.xml.bind</groupId>-->
+<!--            <artifactId>jaxb-api</artifactId>-->
+<!--            <version>2.3.1</version>-->
+<!--            <scope>provided</scope>-->
+<!--        </dependency>-->
+
+        <dependency>
+            <groupId>jakarta.ws.rs</groupId>
+            <artifactId>jakarta.ws.rs-api</artifactId>
+            <version>3.1.0</version>
+<!--            <scope>provided</scope>-->
         </dependency>
 
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>42.2.19</version>
+            <groupId>jakarta.xml.bind</groupId>
+            <artifactId>jakarta.xml.bind-api</artifactId>
+            <version>4.0.0</version>
         </dependency>
-
         <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-dbcp2</artifactId>
-            <version>2.1.1</version>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <version>4.0.0</version>
         </dependency>
-
-        <dependency>
-             <groupId>commons-dbcp</groupId>
-             <artifactId>commons-dbcp</artifactId>
-            <version>1.3</version>
-         </dependency>
+<!--
         <dependency>
             <groupId>com.sun.jersey.contribs</groupId>
             <artifactId>jersey-spring</artifactId>
@@ -99,6 +198,31 @@
 
             </exclusions>
         </dependency>
+-->
+        <dependency>
+            <groupId>NQjc</groupId>
+            <artifactId>NQjc</artifactId>
+<!--            <version>8.10.85.0</version>-->
+            <version>8.10.136.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-dbcp2</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+
+        <dependency>
+             <groupId>commons-dbcp</groupId>
+             <artifactId>commons-dbcp</artifactId>
+            <version>1.3</version>
+         </dependency>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -119,6 +243,12 @@
             <version>${spring.version}</version>
         </dependency>
 -->
+
+<!--        <dependency>-->
+<!--            <groupId>jakarta.platform</groupId>-->
+<!--            <artifactId>jakarta.jakartaee-web-api</artifactId>-->
+<!--            <version>10.0.0</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-beans</artifactId>
@@ -138,6 +268,12 @@
             <artifactId>spring-web</artifactId>
             <version>${spring.version}</version>
             <!--<scope>provided</scope>-->
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>${spring.version}</version> <!-- Use the latest version available -->
         </dependency>
 
         <dependency>
@@ -179,8 +315,8 @@
         <!--</dependency>-->
     </dependencies>
     <properties>
-        <jersey-version>1.19.4</jersey-version>
-        <spring.version>3.0.1.RELEASE</spring.version>
+        <jersey-version>3.1.8</jersey-version>
+        <spring.version>6.1.5</spring.version>
         <mockitoversion>4.0.0</mockitoversion>
     </properties>
 <!--

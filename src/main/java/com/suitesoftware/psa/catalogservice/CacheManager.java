@@ -7,7 +7,9 @@ import java.sql.SQLException;
 
 public interface CacheManager {
 
-    void updateCacheItems() throws SQLException;
+    void updateCacheCustomers(String accountId) throws SQLException;
+
+    void updateCacheItems(String accountId) throws SQLException;
 
     void updateCacheCustomerPrices(CatalogCustomer catalogCustomer) throws SQLException;
 }

@@ -5,7 +5,7 @@ import com.suitesoftware.psa.catalogservice.dto.Part;
 import org.springframework.jdbc.core.BeanPropertyRowMapper;
 import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.simple.SimpleJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
 import javax.sql.DataSource;
 import java.math.BigDecimal;
@@ -25,25 +25,27 @@ public class NsDaoImpl implements com.suitesoftware.psa.catalogservice.NsDao {
 
     String selectNsCatalogCustomerSql;
 
-    String selectNsCatalogCustomersSql;
+    String selectNsCustomersSql;
     String selectNsBasePartsSql;
     String selectNsCustomerPricesSql;
 //    String selectAllNsCustomersSql;
 
-    public String getSelectNsCatalogCustomerSql() {
-        return selectNsCatalogCustomerSql;
+    String selectCatalogCustomersSql;
+
+    public String getSelectCatalogCustomersSql() {
+        return selectCatalogCustomersSql;
     }
 
-    public void setSelectNsCatalogCustomerSql(String selectNsCatalogCustomerSql) {
-        this.selectNsCatalogCustomerSql = selectNsCatalogCustomerSql;
+    public void setSelectCatalogCustomersSql(String selectCatalogCustomersSql) {
+        this.selectCatalogCustomersSql = selectCatalogCustomersSql;
     }
 
-    public String getSelectNsCatalogCustomersSql() {
-        return selectNsCatalogCustomersSql;
+    public String getSelectNsCustomersSql() {
+        return selectNsCustomersSql;
     }
 
-    public void setSelectNsCatalogCustomersSql(String selectNsCatalogCustomersSql) {
-        this.selectNsCatalogCustomersSql = selectNsCatalogCustomersSql;
+    public void setSelectNsCustomersSql(String selectNsCustomersSql) {
+        this.selectNsCustomersSql = selectNsCustomersSql;
     }
 
     public String getSelectNsBasePartsSql() {
@@ -62,43 +64,42 @@ public class NsDaoImpl implements com.suitesoftware.psa.catalogservice.NsDao {
         this.selectNsCustomerPricesSql = selectNsCustomerPricesSql;
     }
 
-//    public String getSelectAllNsCustomersSql() {
-//        return selectAllNsCustomersSql;
-//    }
-//
-//    public void setSelectAllCustomersSql(String selectAllNsCustomersSql) {
-//        this.selectAllNsCustomersSql = selectAllNsCustomersSql;
-//    }
-
     public void setDatasource(DataSource datasource) {
         this.datasourceTL.set(datasource);
     }
 
     @Override
     public CatalogCustomer getCatalogCustomer(Integer customerId) {
-        SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
+        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(datasourceTL.get());
+        //SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("customerId",customerId);
-        return jdbcTemplate.queryForObject(getSelectNsCatalogCustomerSql(),new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class), msps);
+        String sql = getSelectCatalogCustomersSql() + " WHERE customer_id = :customerId and account_id = :accountId";
+        //return jdbcTemplate.queryForObject(sql,new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class), msps);
+        return jdbcTemplate.queryForObject(sql,msps,new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class));
     }
 
 
     @Override
     public List<CatalogCustomer> getCatalogCustomers() {
-        SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
+        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(datasourceTL.get());
+        //SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
         MapSqlParameterSource msps = new MapSqlParameterSource();
-        return jdbcTemplate.query(getSelectNsCatalogCustomersSql(),new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class),new HashMap<>());
+        //return jdbcTemplate.query(getSelectCatalogCustomersSql(),new BeanPropertyRowMapper<CatalogCustomer>(CatalogCustomer.class),new HashMap<>());
+        return jdbcTemplate.query(getSelectCatalogCustomersSql(),new BeanPropertyRowMapper<>(CatalogCustomer.class));
     }
 
     @Override
     public List<Part> getBaseParts() {
-        SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
+        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(datasourceTL.get());
+        //SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("priceId",priceId);
         msps.addValue("quantityId",quantityId);
         msps.addValue("currencyId",currencyId);
-        return jdbcTemplate.getNamedParameterJdbcOperations().query(getSelectNsBasePartsSql(),msps,
-                new BeanPropertyRowMapper<Part>(Part.class));
+//        return jdbcTemplate.getNamedParameterJdbcOperations().query(getSelectNsBasePartsSql(),msps,
+//                new BeanPropertyRowMapper<Part>(Part.class));
+        return jdbcTemplate.queryForList(getSelectNsBasePartsSql(),msps,Part.class);
     }
 
 /*
@@ -111,14 +112,17 @@ public class NsDaoImpl implements com.suitesoftware.psa.catalogservice.NsDao {
 */
     @Override
     public void assignCustomerPrices(Map<Integer, Part> partMap, int customerId) {
-        SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
+        //SimpleJdbcTemplate jdbcTemplate = new SimpleJdbcTemplate(datasourceTL.get());
+        NamedParameterJdbcTemplate jdbcTemplate = new NamedParameterJdbcTemplate(datasourceTL.get());
+
         MapSqlParameterSource msps = new MapSqlParameterSource();
         msps.addValue("priceId",priceId);
         msps.addValue("quantityId",quantityId);
         msps.addValue("currencyId",currencyId);
         msps.addValue("customerId",customerId);
 
-        jdbcTemplate.getNamedParameterJdbcOperations().query(getSelectNsCustomerPricesSql(), msps,
+        //jdbcTemplate.getNamedParameterJdbcOperations().query(getSelectNsCustomerPricesSql(), msps,
+        jdbcTemplate.query(getSelectNsCustomerPricesSql(), msps,
                 new RowCallbackHandler() {
                     @Override
                     public void processRow(ResultSet rs) throws SQLException {

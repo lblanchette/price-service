@@ -8,9 +8,13 @@ public interface NsDataSourceFactory {
 
     DataSource newAdminNsDataSource() throws SQLException;
 
-    DataSource newNsDataSource(Map<String,String> params) throws SQLException;
+    DataSource newNsDataSource(Map<String, String> params) throws SQLException;
 
     DataSource newAdminPooledNsDataSource(int poolSize) throws SQLException;
 
-    DataSource newPooledNsDataSource(int poolSize, Map<String,String> params) throws SQLException;
+    DataSource newPooledNsDataSource(int poolSize, Map<String, String> params) throws SQLException;
+
+    String getNsJdbcAccountId();
+
+    void setNsJdbcAccountId(String nsJdbcAccountId);
 }
